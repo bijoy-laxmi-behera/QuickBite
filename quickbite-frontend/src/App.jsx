@@ -13,6 +13,9 @@ import CustomerDashboard from "@/customer/pages/Dashboard";
 import VendorDashboard from "@/vendor/pages/Dashboard";
 import DeliveryDashboard from "@/delivery/pages/Dashboard";
 
+// Admin Login
+import AdminLogin from "@/admin/pages/AdminLogin";
+
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 function App() {
@@ -26,7 +29,11 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* ADMIN */}
+      {/* ADMIN - /admin and /admin/login both show Login page */}
+      <Route path="/admin" element={<AdminLogin />} />
+      <Route path="/admin/login" element={<AdminLogin />} />
+
+      {/* ADMIN - Protected dashboard */}
       <Route
         path="/admin/dashboard"
         element={
