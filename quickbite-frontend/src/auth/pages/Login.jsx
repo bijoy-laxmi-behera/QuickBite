@@ -43,7 +43,7 @@ function Login() {
 
       localStorage.setItem("token", res.data.token);
 
-      navigate("/");
+      navigate("/vendor/dashboard");
     } catch (err) {
       const message = err.response?.data?.message || "Login failed";
       setError(message);
