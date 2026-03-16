@@ -7,21 +7,20 @@ import Register from "@/auth/pages/Register";
 import ForgotPassword from "@/auth/pages/ForgotPassword";
 import ResetPassword from "@/auth/pages/ResetPassword";
 
-// Role Dashboards
-import AdminDashboard from "@/admin/pages/Dashboard";
-import CustomerDashboard from "@/customer/pages/Dashboard";
-import VendorDashboard from "@/vendor/pages/Dashboard";
-import DeliveryDashboard from "@/delivery/pages/Dashboard";
-
-// Admin Login
+// Admin
 import AdminLogin from "@/admin/pages/AdminLogin";
+import AdminDashboard from "@/admin/pages/Dashboard";
+
+// Role Dashboards
+import CustomerDashboard from "@/customer/pages/Dashboard";
+import VendorDashboard from "@/vendor/pages/VendorLayout";
+import DeliveryDashboard from "@/delivery/pages/Dashboard";
 
 import ProtectedRoute from "@/components/ProtectedRoute";
 
 function App() {
   return (
     <Routes>
-
       {/* PUBLIC ROUTES */}
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
@@ -29,11 +28,9 @@ function App() {
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* ADMIN - /admin and /admin/login both show Login page */}
+      {/* ADMIN */}
       <Route path="/admin" element={<AdminLogin />} />
       <Route path="/admin/login" element={<AdminLogin />} />
-
-      {/* ADMIN - Protected dashboard */}
       <Route
         path="/admin/dashboard"
         element={
@@ -53,7 +50,11 @@ function App() {
         }
       />
 
-      {/* VENDOR */}
+      {/* VENDOR - Direct access (for development/testing) */}
+      <Route path="/vendor" element={<VendorDashboard />} />
+      <Route path="/vendor/dashboard" element={<VendorDashboard />} />
+
+      {/* VENDOR - Protected route (for production use) */}
       <Route
         path="/vendor/dashboard"
         element={
@@ -72,7 +73,6 @@ function App() {
           </ProtectedRoute>
         }
       />
-
     </Routes>
   );
 }

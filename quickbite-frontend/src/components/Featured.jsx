@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
+// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 
 const API = import.meta.env.VITE_API_URL;
@@ -34,7 +35,7 @@ export default function Featured() {
   }
 
   return (
-    <section className="relative py-28 px-6 lg:px-20 bg-gradient-to-b from-white via-orange-50 to-white overflow-hidden">
+    <section className="relative py-28 px-6 lg:px-20 bg-linear-to-b from-white via-orange-50 to-white overflow-hidden">
 
       {/* Soft Background Glow */}
       <div className="absolute -top-24 -left-24 w-80 h-80 bg-orange-300/20 rounded-full blur-3xl"></div>
@@ -61,7 +62,7 @@ export default function Featured() {
               className="group relative bg-white/70 backdrop-blur-xl p-8 rounded-3xl shadow-lg border border-orange-100 hover:shadow-2xl transition duration-300"
             >
               {/* Glow Border Effect */}
-              <div className="absolute inset-0 rounded-3xl bg-gradient-to-br from-[#ff6b35]/10 to-orange-200/10 opacity-0 group-hover:opacity-100 transition"></div>
+              <div className="absolute inset-0 rounded-3xl bg-linear-to-br from-[#ff6b35]/10 to-orange-200/10 opacity-0 group-hover:opacity-100 transition"></div>
 
               <div className="relative z-10">
 
