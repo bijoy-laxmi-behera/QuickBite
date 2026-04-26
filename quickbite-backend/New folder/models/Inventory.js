@@ -1,0 +1,44 @@
+const mongoose = require("mongoose");
+
+const inventorySchema = new mongoose.Schema(
+  {
+    vendor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      required: true,
+    },
+
+    name: {
+      type: String,
+      required: true,
+      trim: true,
+    },
+
+    quantity: {
+      type: Number,
+      required: true,
+      default: 0,
+      min: 0,
+    },
+
+    unit: {
+      type: String,
+      enum: ["kg", "g", "ltr", "ml", "pcs"],
+      default: "pcs",
+    },
+
+    threshold: {
+      type: Number,
+      default: 5,
+      min: 0,
+    },
+
+    isAvailable: {
+      type: Boolean,
+      default: true,
+    },
+  },
+  { timestamps: true }
+);
+
+module.exports = mongoose.model("Inventory", inventorySchema);

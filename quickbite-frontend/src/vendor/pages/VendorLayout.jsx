@@ -14,13 +14,13 @@ function VendorLayout() {
 
   const renderPage = () => {
     switch (page) {
-      case "dashboard":   return <Dashboard />;
+      case "dashboard":   return <Dashboard setPage={setPage} />;
       case "menu":        return <MenuManagement />;
       case "inventory":   return <InventoryBatch />;
       case "orders":      return <SubscriptionOrders />;
       case "analytics":   return <Analytics />;
       case "subscribers": return <SubscriberList />;
-      default:            return <Dashboard />;
+      default:            return <Dashboard setPage={setPage} />; // ← fixed
     }
   };
 

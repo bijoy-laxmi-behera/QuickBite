@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   FaThLarge,
   FaUtensils,
@@ -8,17 +10,43 @@ import {
   FaQuestionCircle,
   FaSignOutAlt,
 } from "react-icons/fa";
+import { toast } from "react-hot-toast";
 
 function Sidebar({ sidebarOpen, setSidebarOpen, setPage, activePage }) {
-  const menuItem =
-    "flex items-center gap-3 px-4 py-3 rounded-lg hover:bg-orange-500 transition cursor-pointer";
+  const navigate = useNavigate();
 
-  const activeItem =
-    "flex items-center gap-3 px-4 py-3 rounded-lg bg-orange-500 text-white shadow-md cursor-pointer";
+  // 🔥 Store status state
+  const [isOpen, setIsOpen] = useState(true);
+
+  // 🔥 Menu config (scalable)
+  const menuItems = [
+    { name: "dashboard", label: "Dashboard", icon: FaThLarge },
+    { name: "menu", label: "Menu Management", icon: FaUtensils },
+    { name: "inventory", label: "Inventory & Batch", icon: FaBox },
+    { name: "orders", label: "Subscription Orders", icon: FaClipboardList },
+    { name: "analytics", label: "Analytics", icon: FaChartBar },
+    { name: "subscribers", label: "Subscriber List", icon: FaUsers },
+  ];
+
+  const baseStyle =
+    "flex items-center gap-3 px-4 py-3 rounded-lg transition cursor-pointer";
+
+  const getClass = (page) =>
+    `${baseStyle} ${
+      activePage === page
+        ? "bg-orange-500 text-white shadow-md"
+        : "hover:bg-orange-500 text-gray-300"
+    }`;
 
   const handleClick = (page) => {
     setPage(page);
-    setSidebarOpen(false); // close sidebar on mobile
+    setSidebarOpen(false);
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    toast.success("Logged out");
+    navigate("/login");
   };
 
   return (
@@ -32,11 +60,9 @@ function Sidebar({ sidebarOpen, setSidebarOpen, setPage, activePage }) {
       )}
 
       <div
-        className={`
-      fixed top-0 left-0 h-screen w-64 bg-[#1E0F0A] text-white flex flex-col justify-between
-      transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-      lg:translate-x-0 transition-all duration-300 ease-in-out z-50
-    `}
+        className={`fixed top-0 left-0 h-screen w-64 bg-[#1E0F0A] text-white flex flex-col justify-between
+        transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
+        lg:translate-x-0 transition-all duration-300 z-50`}
       >
         {/* Top Section */}
         <div>
@@ -54,71 +80,52 @@ function Sidebar({ sidebarOpen, setSidebarOpen, setPage, activePage }) {
 
           {/* Navigation */}
           <div className="flex flex-col mt-6 space-y-2 px-3">
-            <button
-              onClick={() => handleClick("dashboard")}
-              className={activePage === "dashboard" ? activeItem : menuItem}
-            >
-              <FaThLarge />
-              Dashboard
-            </button>
-
-            <button
-              onClick={() => handleClick("menu")}
-              className={activePage === "menu" ? activeItem : menuItem}
-            >
-              <FaUtensils />
-              Menu Management
-            </button>
-
-            <button
-              onClick={() => handleClick("inventory")}
-              className={activePage === "inventory" ? activeItem : menuItem}
-            >
-              <FaBox /> Inventory & Batch
-            </button>
-
-            <button
-              onClick={() => handleClick("orders")}
-              className={activePage === "orders" ? activeItem : menuItem}
-            >
-              <FaClipboardList /> Subscription Orders
-            </button>
-
-            <button
-              onClick={() => handleClick("analytics")}
-              className={activePage === "analytics" ? activeItem : menuItem}
-            >
-              <FaChartBar /> Analytics
-            </button>
-
-            <button
-              onClick={() => handleClick("subscribers")}
-              className={activePage === "subscribers" ? activeItem : menuItem}
-            >
-              <FaUsers /> Subscriber List
-            </button>
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.name}
+                  onClick={() => handleClick(item.name)}
+                  className={getClass(item.name)}
+                >
+                  <Icon />
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Bottom Section */}
         <div className="px-4 pb-6">
-          {/* Store Status */}
+
+          {/* STORE STATUS */}
           <div className="bg-[#2A1510] p-4 rounded-xl mb-4">
             <p className="text-xs text-gray-300 mb-2">STORE STATUS</p>
 
-            <button className="w-full bg-orange-500 hover:bg-orange-600 py-2 rounded-lg text-sm font-medium">
-              ● Open for Orders
+            <button
+              onClick={() => setIsOpen(!isOpen)}
+              className={`w-full flex items-center justify-center gap-2 py-2 rounded-lg text-sm font-medium transition ${
+                isOpen
+                  ? "bg-green-500 hover:bg-green-600"
+                  : "bg-red-500 hover:bg-red-600"
+              }`}
+            >
+              ● {isOpen ? "Open for Orders" : "Closed"}
             </button>
           </div>
 
-          {/* Support */}
-          <button className="flex items-center gap-3 text-gray-300 hover:text-white mb-3">
+          {/* SUPPORT */}
+          <button className="flex items-center gap-3 text-gray-300 hover:text-white mb-3 transition">
             <FaQuestionCircle />
             Support
           </button>
 
-          {/* Logout */}
-          <button className="flex items-center gap-3 text-gray-300 hover:text-white">
+          {/* LOGOUT */}
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 text-gray-300 hover:text-red-400 transition"
+          >
             <FaSignOutAlt />
             Logout
           </button>

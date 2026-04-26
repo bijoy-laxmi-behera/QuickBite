@@ -1,23 +1,30 @@
-import { Navigate } from "react-router-dom";
+import { Navigate, useLocation } from "react-router-dom";
 
-export default function ProtectedRoute({ children, allowedRoles }) {
-  const token = localStorage.getItem("token");
+function ProtectedRoute({ children, allowedRoles }) {
+  const location = useLocation();
+
   const user = JSON.parse(localStorage.getItem("user"));
+  const token = localStorage.getItem("token");
 
-  // No token → go to login
-  if (!token) {
-    return <Navigate to="/login" />;
+  const role = (user?.role || "").toLowerCase();
+
+  // 🔴 NOT logged in
+  if (!user || !token) {
+    // 👉 if trying admin route → go to admin login
+    if (location.pathname.startsWith("/admin")) {
+      return <Navigate to="/admin/login" replace />;
+    }
+
+    return <Navigate to="/login" replace />;
   }
 
-  // Token exists but user data is missing/corrupted
-  if (!user || !user.role) {
-    return <Navigate to="/login" />;
+  // 🔴 Wrong role
+  if (!allowedRoles.includes(role)) {
+    return <Navigate to="/" replace />;
   }
 
-  // Role not allowed → go to home
-  if (!allowedRoles.includes(user.role)) {
-    return <Navigate to="/" />;
-  }
-
+  // ✅ Authorized
   return children;
 }
+
+export default ProtectedRoute;

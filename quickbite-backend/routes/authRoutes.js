@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-
+const { protect } = require("../middleware/authMiddleware");
 const {
   register,
   login,
@@ -9,15 +9,21 @@ const {
   changePassword,
 } = require("../controllers/authController");
 
-const { protect } = require("../middleware/authMiddleware");
-
-// ================= PUBLIC ROUTES =================
+// Public routes
 router.post("/register", register);
 router.post("/login", login);
 router.post("/forgot-password", forgotPassword);
 router.post("/reset-password", resetPassword);
 
-// ================= PROTECTED ROUTES =================
+// Protected routes
 router.post("/change-password", protect, changePassword);
+
+// GET current logged in user
+router.get("/me", protect, (req, res) => {
+  res.status(200).json({
+    success: true,
+    user: req.user,
+  });
+});
 
 module.exports = router;

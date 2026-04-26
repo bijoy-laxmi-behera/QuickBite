@@ -1,95 +1,146 @@
+import { useEffect, useState } from "react";
+import API from "@/services/axios";
+import toast from "react-hot-toast";
+
 import {
-LineChart,
-Line,
-XAxis,
-YAxis,
-Tooltip,
-ResponsiveContainer
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer
 } from "recharts";
 
 function Analytics() {
 
-const salesData = [
-{ day: "Mon", revenue: 1200 },
-{ day: "Tue", revenue: 1500 },
-{ day: "Wed", revenue: 1800 },
-{ day: "Thu", revenue: 1400 },
-{ day: "Fri", revenue: 2100 },
-{ day: "Sat", revenue: 2600 },
-{ day: "Sun", revenue: 2000 }
-];
+  const [overview, setOverview] = useState({});
+  const [revenueData, setRevenueData] = useState([]);
+  const [topItem, setTopItem] = useState("N/A");
+  const [loading, setLoading] = useState(true);
 
-return ( <div className="p-6">
+  useEffect(() => {
+    fetchAnalytics();
+  }, []);
 
+  const fetchAnalytics = async () => {
+    try {
+      const [overviewRes, revenueRes, topItemsRes] = await Promise.all([
+        API.get("/vendor/overview"),
+        API.get("/vendor/weekly-revenue"),
+        API.get("/vendor/top-items"),
+      ]);
 
-  {/* Header */}
-  <div className="mb-6">
-    <h1 className="text-2xl font-bold">Sales Analytics</h1>
-    <p className="text-gray-500 text-sm">
-      Track revenue and subscriber growth.
-    </p>
-  </div>
+      // OVERVIEW
+      setOverview(overviewRes.data.data || {});
 
+      // REVENUE FORMAT
+      const formattedRevenue = (revenueRes.data.revenue || []).map((item) => ({
+        day: new Date(item._id).toLocaleDateString("en-US", {
+          weekday: "short",
+        }),
+        revenue: item.totalRevenue,
+      }));
 
-  {/* Stats Cards */}
-  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+      setRevenueData(formattedRevenue);
 
-    <div className="bg-white p-4 rounded-xl shadow-sm">
-      <p className="text-gray-500 text-sm">TOTAL REVENUE</p>
-      <h2 className="text-xl font-bold mt-1">₹48,200</h2>
-    </div>
+      // TOP ITEM
+      if (topItemsRes.data.items?.length > 0) {
+        setTopItem("Top Selling Item");
+      }
 
-    <div className="bg-white p-4 rounded-xl shadow-sm">
-      <p className="text-gray-500 text-sm">ACTIVE SUBSCRIBERS</p>
-      <h2 className="text-xl font-bold mt-1">142</h2>
-    </div>
+    } catch {
+      toast.error("Failed to load analytics");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-    <div className="bg-white p-4 rounded-xl shadow-sm">
-      <p className="text-gray-500 text-sm">ORDERS THIS WEEK</p>
-      <h2 className="text-xl font-bold mt-1">324</h2>
-    </div>
+  if (loading) {
+    return <div className="p-6 text-gray-500">Loading analytics...</div>;
+  }
 
-    <div className="bg-white p-4 rounded-xl shadow-sm">
-      <p className="text-gray-500 text-sm">TOP MEAL</p>
-      <h2 className="text-xl font-bold mt-1">Veg Thali</h2>
-    </div>
+  return (
+    <div className="p-4 sm:p-6">
 
-  </div>
+      {/* HEADER */}
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold">Sales Analytics</h1>
+        <p className="text-gray-500 text-sm">
+          Track revenue and performance insights.
+        </p>
+      </div>
 
+      {/* STATS */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
 
-  {/* Sales Chart */}
-  <div className="bg-white p-6 rounded-xl shadow-sm">
-
-    <h2 className="text-lg font-semibold mb-4">
-      Weekly Revenue
-    </h2>
-
-    <ResponsiveContainer width="100%" height={300}>
-
-      <LineChart data={salesData}>
-
-        <XAxis dataKey="day" />
-
-        <YAxis />
-
-        <Tooltip />
-
-        <Line
-          type="monotone"
-          dataKey="revenue"
-          stroke="#f97316"
-          strokeWidth={3}
+        <StatCard
+          title="Total Revenue"
+          value={`₹${overview?.revenue || 0}`}
         />
 
-      </LineChart>
+        <StatCard
+          title="Total Orders"
+          value={overview?.totalOrders || 0}
+        />
 
-    </ResponsiveContainer>
+        <StatCard
+          title="Avg Prep Time"
+          value={`${overview?.avgPrepTime || 0} min`}
+        />
 
-  </div>
+        <StatCard
+          title="Top Item"
+          value={topItem}
+        />
 
-</div>
+      </div>
 
-);
+      {/* CHART */}
+      <div className="bg-white p-4 sm:p-6 rounded-xl shadow-sm">
+
+        <h2 className="text-lg font-semibold mb-4">
+          Weekly Revenue
+        </h2>
+
+        {revenueData.length === 0 ? (
+          <p className="text-gray-400 text-sm">No data available</p>
+        ) : (
+          <ResponsiveContainer width="100%" height={300}>
+
+            <LineChart data={revenueData}>
+
+              <XAxis dataKey="day" />
+
+              <YAxis />
+
+              <Tooltip />
+
+              <Line
+                type="monotone"
+                dataKey="revenue"
+                stroke="#f97316"
+                strokeWidth={3}
+              />
+
+            </LineChart>
+
+          </ResponsiveContainer>
+        )}
+
+      </div>
+
+    </div>
+  );
+}
+
+/* REUSABLE CARD */
+function StatCard({ title, value }) {
+  return (
+    <div className="bg-white p-4 rounded-xl shadow-sm hover:shadow-md transition">
+      <p className="text-gray-500 text-sm">{title}</p>
+      <h2 className="text-lg sm:text-xl font-bold mt-1">{value}</h2>
+    </div>
+  );
 }
 
 export default Analytics;

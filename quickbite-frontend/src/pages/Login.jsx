@@ -41,11 +41,20 @@ function Login() {
 
       const res = await axios.post(`${API}/api/auth/login`, formData);
 
+      // Save token and user to localStorage
       localStorage.setItem("token", res.data.token);
+      localStorage.setItem("user", JSON.stringify(res.data.user));
+
+      // Redirect based on role
+      const role = res.data.user?.role;
+      if (role === "vendor")   return navigate("/vendor/dashboard");
+      if (role === "customer") return navigate("/customer/dashboard");
+      if (role === "delivery") return navigate("/delivery/dashboard");
+      if (role === "admin")    return navigate("/admin/dashboard");
       navigate("/");
+
     } catch (err) {
-      const message =
-        err.response?.data?.message || "Login failed";
+      const message = err.response?.data?.message || "Login failed";
       setError(message);
     } finally {
       setLoading(false);
@@ -180,7 +189,7 @@ function Login() {
         </form>
 
         <p className="text-sm text-white/80 mt-8 text-center">
-          Don’t have an account?{" "}
+          Don't have an account?{" "}
           <Link
             to="/register"
             className="font-medium text-white hover:underline"

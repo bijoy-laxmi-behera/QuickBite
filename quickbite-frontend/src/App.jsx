@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 // Public Pages
 import Landing from "@/public/pages/Landing";
@@ -21,16 +21,17 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 function App() {
   return (
     <Routes>
-      {/* PUBLIC ROUTES */}
+      {/* ================= PUBLIC ROUTES ================= */}
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
       <Route path="/register" element={<Register />} />
       <Route path="/forgot-password" element={<ForgotPassword />} />
       <Route path="/reset-password" element={<ResetPassword />} />
 
-      {/* ADMIN */}
-      <Route path="/admin" element={<AdminLogin />} />
+      {/* ================= ADMIN ROUTES ================= */}
+      <Route path="/admin" element={<Navigate to="/admin/login" replace />} />
       <Route path="/admin/login" element={<AdminLogin />} />
+
       <Route
         path="/admin/dashboard"
         element={
@@ -40,7 +41,7 @@ function App() {
         }
       />
 
-      {/* CUSTOMER */}
+      {/* ================= CUSTOMER ================= */}
       <Route
         path="/customer/dashboard"
         element={
@@ -50,11 +51,7 @@ function App() {
         }
       />
 
-      {/* VENDOR - Direct access (for development/testing) */}
-      <Route path="/vendor" element={<VendorDashboard />} />
-      <Route path="/vendor/dashboard" element={<VendorDashboard />} />
-
-      {/* VENDOR - Protected route (for production use) */}
+      {/* ================= VENDOR ================= */}
       <Route
         path="/vendor/dashboard"
         element={
@@ -64,7 +61,7 @@ function App() {
         }
       />
 
-      {/* DELIVERY */}
+      {/* ================= DELIVERY ================= */}
       <Route
         path="/delivery/dashboard"
         element={
@@ -73,6 +70,9 @@ function App() {
           </ProtectedRoute>
         }
       />
+
+      {/* ================= FALLBACK ================= */}
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
 }

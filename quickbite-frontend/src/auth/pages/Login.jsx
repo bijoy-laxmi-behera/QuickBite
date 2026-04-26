@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import axios from "axios";
-// eslint-disable-next-line no-unused-vars
 import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import Logo from "@/assets/logo.png";
@@ -27,6 +26,13 @@ function Login() {
     }));
   };
 
+  const roleToRoute = {
+    admin: "/admin/dashboard",
+    customer: "/customer/dashboard",
+    vendor: "/vendor/dashboard",
+    delivery: "/delivery/dashboard",
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
@@ -41,11 +47,32 @@ function Login() {
 
       const res = await axios.post(`${API}/api/auth/login`, formData);
 
-      localStorage.setItem("token", res.data.token);
+      // 🔎 Debug (remove after verification)
+      console.log("LOGIN RESPONSE:", res.data);
 
-      navigate("/vendor/dashboard");
+      // ✅ Save token
+      if (res.data?.token) {
+        localStorage.setItem("token", res.data.token);
+      }
+
+      // ✅ Normalize user object
+      const user = res.data?.user || res.data;
+      localStorage.setItem("user", JSON.stringify(user));
+
+      // ✅ Extract role safely
+      const role = (user?.role || user?.Role || "").toLowerCase();
+
+      // ✅ Navigate based on role
+      const target = roleToRoute[role];
+      if (target) {
+        navigate(target, { replace: true });
+      } else {
+        // Fallback if role missing/invalid
+        navigate("/", { replace: true });
+      }
     } catch (err) {
-      const message = err.response?.data?.message || "Login failed";
+      const message =
+        err.response?.data?.message || "Login failed. Please try again.";
       setError(message);
     } finally {
       setLoading(false);
@@ -53,9 +80,8 @@ function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-500 via-red-500 to-yellow-400 p-6 relative overflow-hidden">
-
-      {/* Animated Background Blur Shapes */}
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-500 via-red-500 to-yellow-400 p-6 relative overflow-hidden">
+      {/* Background blur shapes */}
       <div className="absolute w-96 h-96 bg-white/20 rounded-full blur-3xl top-10 left-10"></div>
       <div className="absolute w-96 h-96 bg-yellow-300/20 rounded-full blur-3xl bottom-10 right-10"></div>
 
@@ -65,7 +91,7 @@ function Login() {
         transition={{ duration: 0.6 }}
         className="w-full max-w-md backdrop-blur-xl bg-white/20 border border-white/30 shadow-2xl rounded-3xl p-10"
       >
-        {/* Logo + Title */}
+        {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <img src={Logo} alt="QuickBite Logo" className="w-16 mb-4" />
           <h1 className="text-3xl font-bold text-white tracking-wide">
@@ -89,7 +115,6 @@ function Login() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-
           {/* Email */}
           <div className="relative">
             <input
@@ -150,7 +175,7 @@ function Login() {
               ${
                 loading
                   ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-linear-to-r from-orange-500 to-red-600 shadow-lg hover:shadow-xl"
+                  : "bg-gradient-to-r from-orange-500 to-red-600 shadow-lg hover:shadow-xl"
               }`}
           >
             {loading ? "Logging in..." : "Login"}

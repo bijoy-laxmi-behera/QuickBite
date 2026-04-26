@@ -1,7 +1,7 @@
 import { FaCheckCircle } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-
+import bgvideo from "../assets/background_video.mp4";
 const images = [
   "https://images.unsplash.com/photo-1600891964599-f61ba0e24092",
   "https://images.unsplash.com/photo-1550547660-d9450f859349",
@@ -43,7 +43,7 @@ export default function Hero() {
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
 
 
-      {/* 🎥 Background Video */}
+      {/* Background Video */}
       <video
         autoPlay
         loop
@@ -52,13 +52,13 @@ export default function Hero() {
         className="absolute inset-0 w-full h-full object-cover"
       >
         <source
-          src="https://videos.pexels.com/video-files/854180/854180-hd_1920_1080_25fps.mp4"
+          src={bgvideo}
           type="video/mp4"
         />
       </video>
 
       {/* Overlay */}
-      <div className="absolute inset-0 bg-linear-to-r from-black/70 via-black/60 to-black/70"></div>
+      <div className="absolute inset-0 bg-linear-to-r from-black/60 via-black/50 to-black/60"></div>
 
       {/* Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-20 grid lg:grid-cols-2 gap-16 items-center text-white">
