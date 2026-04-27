@@ -1,107 +1,100 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 function Orders() {
+  const [orders, setOrders] = useState([]);
 
-  // ✅ Dummy data (replace with API later)
-  const [orders, setOrders] = useState([
-    {
-      id: 1,
-      items: ["Pizza", "Coke"],
-      total: 320,
-      status: "Delivered"
-    },
-    {
-      id: 2,
-      items: ["Biryani"],
-      total: 250,
-      status: "Preparing"
-    }
-  ]);
+  // 🔁 Load orders
+  useEffect(() => {
+    const savedOrders = JSON.parse(localStorage.getItem("orders")) || [];
 
-  // ✅ Cancel Order
-  const handleCancel = (id) => {
-    setOrders(prev =>
-      prev.map(order =>
-        order.id === id
-          ? { ...order, status: "Cancelled" }
-          : order
-      )
-    );
-  };
+    // ✅ avoid mutation
+    setOrders([...savedOrders].reverse());
+  }, []);
 
-  // ✅ Reorder
-  const handleReorder = (order) => {
-    alert("Items added to cart 🛒");
-    // later connect with cart API
+  // 🎯 Status logic (basic simulation)
+  const getStatus = (date) => {
+    const diff = (Date.now() - new Date(date)) / 1000;
+
+    if (diff < 60) return "Preparing";
+    if (diff < 180) return "Out for Delivery";
+    return "Delivered";
   };
 
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="p-6 bg-gray-100 min-h-screen max-w-3xl mx-auto">
 
-      <h2 className="text-xl font-bold mb-4">My Orders</h2>
+      <h2 className="text-2xl font-bold mb-6">My Orders 📦</h2>
 
       {orders.length === 0 ? (
-        <p>No orders yet</p>
+        <div className="text-center text-gray-500 mt-10">
+          <p>No orders yet</p>
+        </div>
       ) : (
-        orders.map((order) => (
-          <div
-            key={order.id}
-            className="bg-white p-4 rounded-xl shadow mb-4"
-          >
+        orders.map((order) => {
+          const status = getStatus(order.date);
 
-            <h3 className="font-semibold">
-              Order #{order.id}
-            </h3>
+          return (
+            <div
+              key={order.id}
+              className="bg-white p-4 rounded-xl shadow mb-4"
+            >
+              {/* 🧾 Header */}
+              <div className="flex justify-between mb-2">
+                <span className="font-semibold">
+                  Order #{order.id}
+                </span>
+                <span className="text-sm text-gray-500">
+                  {new Date(order.date).toLocaleString()}
+                </span>
+              </div>
 
-            <p className="text-sm text-gray-500">
-              {order.items.join(", ")}
-            </p>
+              {/* 📍 Address */}
+              <p className="text-sm text-gray-600 mb-2">
+                📍 {order.address || "No address"}
+              </p>
 
-            <p className="mt-1 font-medium">
-              ₹{order.total}
-            </p>
+              {/* 🍽 Items */}
+              <div className="mb-2">
+                {(order.items || []).map((item, idx) => (
+                  <div
+                    key={idx}
+                    className="flex justify-between text-sm"
+                  >
+                    <span>
+                      {item.name} × {item.qty || 1}
+                    </span>
+                    <span>
+                      ₹{(item.price || 0) * (item.qty || 1)}
+                    </span>
+                  </div>
+                ))}
+              </div>
 
-            <p className={`mt-1 text-sm ${
-              order.status === "Delivered"
-                ? "text-green-600"
-                : order.status === "Cancelled"
-                ? "text-red-500"
-                : "text-orange-500"
-            }`}>
-              {order.status}
-            </p>
+              {/* 💳 Payment */}
+              <p className="text-sm text-gray-500">
+                Payment: {(order.payment || "N/A").toUpperCase()}
+              </p>
 
-            <div className="flex gap-2 mt-3">
+              {/* 💰 Total */}
+              <h3 className="font-bold mt-2">
+                Total: ₹{order.total || 0}
+              </h3>
 
-              {/* TRACK */}
-              <button
-                className="px-3 py-1 bg-gray-200 rounded"
+              {/* 📦 Status */}
+              <span
+                className={`inline-block mt-2 text-xs px-2 py-1 rounded ${
+                  status === "Delivered"
+                    ? "bg-green-100 text-green-600"
+                    : status === "Out for Delivery"
+                    ? "bg-yellow-100 text-yellow-600"
+                    : "bg-blue-100 text-blue-600"
+                }`}
               >
-                Track
-              </button>
-
-              {/* CANCEL */}
-              {order.status === "Preparing" && (
-                <button
-                  onClick={() => handleCancel(order.id)}
-                  className="px-3 py-1 bg-red-500 text-white rounded"
-                >
-                  Cancel
-                </button>
-              )}
-
-              {/* REORDER */}
-              <button
-                onClick={() => handleReorder(order)}
-                className="px-3 py-1 bg-orange-500 text-white rounded"
-              >
-                Reorder
-              </button>
-
+                {status}
+              </span>
             </div>
-
-          </div>
-        ))
+          );
+        })
       )}
 
     </div>

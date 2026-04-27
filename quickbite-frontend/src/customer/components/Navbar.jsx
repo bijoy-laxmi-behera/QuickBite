@@ -1,30 +1,43 @@
-import { useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { useCart } from "@/context/CartContext";
 
 function Navbar() {
-  const [vegOnly, setVegOnly] = useState(false);
+  const navigate = useNavigate();
+  const { cart } = useCart();
+
+  const totalItems = cart.reduce((sum, item) => sum + item.qty, 0);
 
   return (
-    <div className="bg-[#2b0a03] text-white p-4 flex flex-col gap-3">
+    <div className="bg-[#2b0a03] text-white p-4 flex justify-between items-center">
 
-      {/* TOP ROW */}
-      <div className="flex justify-between items-center">
+      <h1
+        className="text-xl font-bold cursor-pointer"
+        onClick={() => navigate("/customer/home")}
+      >
+        QuickBite
+      </h1>
 
-       
+      <div className="flex items-center gap-4">
 
-        <div className="flex items-center gap-4">
+        <button onClick={() => navigate("/customer/orders")}>
+          Orders
+        </button>
 
+        <button onClick={() => navigate("/customer/cart")}>
+          Cart ({totalItems})
+        </button>
 
-        </div>
+        <button
+          onClick={() => {
+            localStorage.clear();
+            navigate("/login");
+          }}
+          className="text-red-400"
+        >
+          Logout
+        </button>
 
       </div>
-
-      {/* SEARCH ONLY (CLEAN UI) */}
-      <input
-        type="text"
-        placeholder="Search for food, restaurants..."
-        className="px-4 py-3 rounded-xl text-black w-full"
-      />
-
     </div>
   );
 }

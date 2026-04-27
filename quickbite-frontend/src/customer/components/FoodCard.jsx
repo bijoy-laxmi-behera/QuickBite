@@ -1,4 +1,7 @@
-function FoodCard({ item, setCart }) {
+import { useCart } from "@/context/CartContext";
+
+function FoodCard({ item }) {
+  const { cart, setCart } = useCart();
 
   const handleAdd = () => {
     setCart((prev) => {
@@ -19,29 +22,33 @@ function FoodCard({ item, setCart }) {
   return (
     <div className="bg-white rounded-xl p-4 shadow hover:shadow-lg transition flex justify-between items-center">
 
-  <div>
-    <h3 className="font-semibold text-lg">{item.name}</h3>
+      <div>
+        <h3 className="font-semibold text-lg">{item.name}</h3>
 
-    <p className="text-sm text-gray-500">{item.category}</p>
+        <p className="text-sm text-gray-500">{item.category}</p>
 
-    <p className="mt-1 font-bold text-orange-500">
-      ₹{item.price}
-    </p>
-  </div>
+        <p className="mt-1 font-bold text-orange-500">
+          ₹{item.price}
+        </p>
+      </div>
 
-  <div className="text-right">
+      <div className="text-right">
 
-    <img
-      src={item.image || restaurant.image}
-      className="w-24 h-24 rounded-lg object-cover mb-2"
-    />
+        <img
+          src={item.image || "https://via.placeholder.com/100"}
+          alt={item.name}
+          className="w-24 h-24 rounded-lg object-cover mb-2"
+        />
 
-    <button className="bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-600 transition">
-      Add
-    </button>
+        <button
+          onClick={handleAdd}  // ✅ FIXED
+          className="bg-orange-500 text-white px-3 py-1 rounded-lg hover:bg-orange-600 transition"
+        >
+          Add
+        </button>
 
-  </div>
-</div>
+      </div>
+    </div>
   );
 }
 

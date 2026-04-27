@@ -1,6 +1,14 @@
 import { useState, useEffect } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useCart } from "@/context/CartContext";
 
-function Restaurant({ restaurant, setCart, cart, setPage }) {
+function Restaurant() {
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const { cart, setCart } = useCart();
+
+  const restaurant = location.state?.restaurant;
 
   const [menu, setMenu] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -9,51 +17,72 @@ function Restaurant({ restaurant, setCart, cart, setPage }) {
   const [vegOnly, setVegOnly] = useState(false);
   const [search, setSearch] = useState("");
 
-  // ✅ FETCH FROM BACKEND
- useEffect(() => {
-  if (!restaurant) return;
+  // ✅ Load data
+  useEffect(() => {
+    if (!restaurant) return;
 
-  // ❌ REMOVE BACKEND CALL FOR NOW
-  // fetch(...)
+    if (restaurant.items) {
+      setMenu([
+        {
+          category: "All",
+          items: restaurant.items,
+        },
+      ]);
+      setLoading(false);
+    }
+  }, [restaurant]);
 
-  // ✅ USE LOCAL DATA
-  if (restaurant.items) {
-    setMenu([
-      {
-        category: "All",
-        items: restaurant.items
-      }
-    ]);
-    setLoading(false);
-  }
-
-}, [restaurant]);
-
+  // ❌ Refresh case
   if (!restaurant) {
-    return <div className="p-6">No restaurant selected</div>;
+    return (
+      <div className="p-6 text-center">
+        <p className="mb-4">No restaurant selected</p>
+
+        <button
+          onClick={() => navigate("/customer/home")}
+          className="bg-orange-500 text-white px-4 py-2 rounded"
+        >
+          Go Back
+        </button>
+      </div>
+    );
   }
 
   if (loading) {
     return <div className="p-6">Loading menu...</div>;
   }
 
-  // ✅ FLATTEN MENU (because backend sends category-wise)
-  const allItems = Array.isArray(menu)
-  ? menu.flatMap(cat => cat.items || [])
-  : restaurant.items || [];
+  // ✅ Flatten
+  const allItems = menu.flatMap((cat) => cat.items || []);
 
-  const filteredItems = allItems.filter(item => {
+  // ✅ Filter
+  const filteredItems = allItems.filter((item) => {
     const categoryMatch =
       activeCategory === "All" || item.category === activeCategory;
 
-    const vegMatch =
-      !vegOnly || item.type === "veg";
+    const vegMatch = !vegOnly || item.type === "veg";
 
-    const searchMatch =
-      item.name.toLowerCase().includes(search.toLowerCase());
+    const searchMatch = item.name
+      .toLowerCase()
+      .includes(search.toLowerCase());
 
     return categoryMatch && vegMatch && searchMatch;
   });
+
+  // ✅ Add to cart
+  const addToCart = (item) => {
+    setCart((prev) => {
+      const existing = prev.find((i) => i.id === item.id);
+
+      if (existing) {
+        return prev.map((i) =>
+          i.id === item.id ? { ...i, qty: i.qty + 1 } : i
+        );
+      }
+
+      return [...prev, { ...item, qty: 1 }];
+    });
+  };
 
   return (
     <div className="p-4">
@@ -62,7 +91,7 @@ function Restaurant({ restaurant, setCart, cart, setPage }) {
         {restaurant.name}
       </h1>
 
-      {/* SEARCH */}
+      {/* 🔍 SEARCH */}
       <input
         placeholder="Search dishes..."
         value={search}
@@ -70,24 +99,26 @@ function Restaurant({ restaurant, setCart, cart, setPage }) {
         className="w-full p-2 border rounded mb-4"
       />
 
-      {/* ITEMS */}
-      {filteredItems.map(item => (
-        <div key={item._id} className="border p-3 mb-2 rounded">
+      {/* 🍽 ITEMS */}
+      {filteredItems.length === 0 ? (
+        <p className="text-gray-500">No items found</p>
+      ) : (
+        filteredItems.map((item) => (
+          <div key={item.id} className="border p-3 mb-2 rounded">
 
-          <h3>{item.name}</h3>
-          <p>₹{item.price}</p>
+            <h3>{item.name}</h3>
+            <p>₹{item.price}</p>
 
-          <button
-            onClick={() =>
-              setCart(prev => [...prev, { ...item, qty: 1 }])
-            }
-            className="bg-orange-500 text-white px-3 py-1 rounded mt-2"
-          >
-            Add
-          </button>
+            <button
+              onClick={() => addToCart(item)}
+              className="bg-orange-500 text-white px-3 py-1 rounded mt-2"
+            >
+              Add
+            </button>
 
-        </div>
-      ))}
+          </div>
+        ))
+      )}
 
     </div>
   );

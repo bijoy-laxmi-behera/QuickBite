@@ -1,16 +1,49 @@
 import { useState } from "react";
+import { useNavigate, useLocation } from "react-router-dom";
 
-function SubscriptionCheckout({ setPage }) {
+function SubscriptionCheckout() {
+  const navigate = useNavigate();
+  const location = useLocation();
 
-  const [plan, setPlan] = useState("weekly");
+  // ✅ get plan from previous page
+  const selectedPlan = location.state?.plan || "weekly";
+
+  const [plan, setPlan] = useState(selectedPlan);
   const [mealType, setMealType] = useState("veg");
   const [address, setAddress] = useState("");
+
+  const handleSubscribe = () => {
+    if (!address.trim()) {
+      alert("Enter address ❗");
+      return;
+    }
+
+    // 💾 Save subscription
+    const subscriptions =
+      JSON.parse(localStorage.getItem("subscriptions")) || [];
+
+    const newSub = {
+      id: Date.now(),
+      plan,
+      mealType,
+      address,
+      startDate: new Date().toISOString()
+    };
+
+    localStorage.setItem(
+      "subscriptions",
+      JSON.stringify([...subscriptions, newSub])
+    );
+
+    // ✅ Navigate
+    navigate("/customer/subscription-success");
+  };
 
   return (
     <div className="p-6 max-w-xl mx-auto">
 
       <h2 className="text-2xl font-bold mb-4">
-        🍱 Subscription 
+        🍱 Subscription Checkout
       </h2>
 
       {/* PLAN */}
@@ -54,14 +87,7 @@ function SubscriptionCheckout({ setPage }) {
 
       {/* BUTTON */}
       <button
-        onClick={() => {
-          if (!address) {
-            alert("Enter address");
-            return;
-          }
-
-          setPage("subscriptionSuccess");
-        }}
+        onClick={handleSubscribe}
         className="w-full bg-orange-500 text-white py-3 rounded"
       >
         Pay & Subscribe

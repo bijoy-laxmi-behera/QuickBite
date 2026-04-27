@@ -1,13 +1,30 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 function Addresses() {
   const [addresses, setAddresses] = useState([]);
   const [input, setInput] = useState("");
 
+  // ✅ Load from localStorage
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem("addresses"));
+    if (saved) setAddresses(saved);
+  }, []);
+
+  // ✅ Save to localStorage
+  useEffect(() => {
+    localStorage.setItem("addresses", JSON.stringify(addresses));
+  }, [addresses]);
+
   const addAddress = () => {
-    if (!input) return;
-    setAddresses([...addresses, input]);
+    if (!input.trim()) return;
+
+    setAddresses([...addresses, input.trim()]);
     setInput("");
+  };
+
+  const deleteAddress = (index) => {
+    const updated = addresses.filter((_, i) => i !== index);
+    setAddresses(updated);
   };
 
   return (
@@ -30,8 +47,18 @@ function Addresses() {
       </div>
 
       {addresses.map((addr, i) => (
-        <div key={i} className="bg-white p-3 rounded shadow mb-2">
-          {addr}
+        <div
+          key={i}
+          className="bg-white p-3 rounded shadow mb-2 flex justify-between items-center"
+        >
+          <span>{addr}</span>
+
+          <button
+            onClick={() => deleteAddress(i)}
+            className="text-red-500 text-sm"
+          >
+            Delete
+          </button>
         </div>
       ))}
     </div>

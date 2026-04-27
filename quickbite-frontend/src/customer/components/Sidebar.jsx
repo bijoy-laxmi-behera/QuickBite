@@ -1,6 +1,5 @@
 import {
   FaHome,
-  FaUtensils,
   FaShoppingCart,
   FaClipboardList,
   FaHeart,
@@ -11,65 +10,70 @@ import {
   FaSignOutAlt
 } from "react-icons/fa";
 
-function Sidebar({ setPage, handleLogout, sidebarOpen }) {
-  return (
-    <div
-      className={`
-        fixed md:static top-0 left-0 h-full w-64
-        bg-gradient-to-b from-[#1a0f0a] to-[#2b140c]
-        text-white flex flex-col justify-between
-        transform ${sidebarOpen ? "translate-x-0" : "-translate-x-full"}
-        md:translate-x-0 transition duration-300 z-50
-      `}
-    >
+import { useNavigate, useLocation } from "react-router-dom";
 
-      {/* TOP */}
+function Sidebar() {
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  const logout = () => {
+    localStorage.clear();
+    navigate("/login");
+  };
+
+  const Item = ({ icon, label, path }) => {
+    const active = location.pathname === path;
+
+    return (
+      <div
+        onClick={() => navigate(path)}
+        className={`flex items-center gap-3 px-4 py-2 rounded-lg cursor-pointer transition
+          ${active 
+            ? "bg-orange-100 text-orange-600 font-semibold" 
+            : "hover:bg-gray-100"}
+        `}
+      >
+        {icon}
+        <span>{label}</span>
+      </div>
+    );
+  };
+
+  return (
+    <div className="w-60 bg-white border-r min-h-screen flex flex-col justify-between">
+
+      {/* Logo */}
       <div>
-        <div className="p-6 border-b border-white/10">
-          <h1 className="text-xl font-bold text-orange-400">QuickBite</h1>
+        <div className="p-6 border-b">
+          <h1 className="text-xl font-bold text-orange-500">
+            QuickBite
+          </h1>
         </div>
 
-        {/* MENU */}
+        {/* Menu */}
         <div className="p-4 space-y-2">
-
-          <SidebarItem icon={<FaHome />} label="Home" onClick={() => setPage("home")} />
-          <SidebarItem icon={<FaUtensils />}label="Restaurant"onClick={() => setPage("home")}/>
-          <SidebarItem icon={<FaShoppingCart />} label="Cart" onClick={() => setPage("cart")} />
-          <SidebarItem icon={<FaClipboardList />} label="Orders" onClick={() => setPage("orders")} />
-        <SidebarItem icon={<FaHeart />} label="Favourites" onClick={() => setPage("favourites")} />
-        <SidebarItem icon={<FaCreditCard />} label="Payments"onClick={() => setPage("payments")}/>
-          <SidebarItem icon={<FaUser />} label="Profile" onClick={() => setPage("profile")} />
-          <SidebarItem icon={<FaStar />} label="Reviews"onClick={() => setPage("reviews")}/>
-          <SidebarItem icon={<FaMapMarkerAlt />} label="Addresses" onClick={() => setPage("addresses")} />
-
+          <Item icon={<FaHome />} label="Home" path="/customer/home" />
+          <Item icon={<FaShoppingCart />} label="Cart" path="/customer/cart" />
+          <Item icon={<FaClipboardList />} label="Orders" path="/customer/orders" />
+          <Item icon={<FaHeart />} label="Favourites" path="/customer/favourites" />
+          <Item icon={<FaCreditCard />} label="Payments" path="/customer/payments" />
+          <Item icon={<FaUser />} label="Profile" path="/customer/profile" />
+          <Item icon={<FaStar />} label="Reviews" path="/customer/reviews" />
+          <Item icon={<FaMapMarkerAlt />} label="Addresses" path="/customer/addresses" />
         </div>
       </div>
 
-      {/* BOTTOM */}
-      <div className="p-4 border-t border-white/10">
-
+      {/* Logout */}
+      <div className="p-4 border-t">
         <button
-          onClick={handleLogout}
-          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-orange-500 hover:bg-orange-600 transition"
+          onClick={logout}
+          className="flex items-center gap-2 w-full px-3 py-2 rounded-lg bg-orange-500 text-white hover:bg-orange-600"
         >
           <FaSignOutAlt />
           Logout
         </button>
-
       </div>
 
-    </div>
-  );
-}
-
-function SidebarItem({ icon, label, onClick }) {
-  return (
-    <div
-      onClick={onClick}
-      className="flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer hover:bg-orange-500 transition"
-    >
-      {icon}
-      <span>{label}</span>
     </div>
   );
 }

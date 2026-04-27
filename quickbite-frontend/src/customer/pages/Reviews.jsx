@@ -1,29 +1,50 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 function Reviews() {
   const [reviews, setReviews] = useState([]);
   const [text, setText] = useState("");
   const [rating, setRating] = useState(5);
 
+  // 🔁 Load from localStorage
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem("reviews")) || [];
+    setReviews(saved);
+  }, []);
+
+  // 💾 Save to localStorage
+  useEffect(() => {
+    localStorage.setItem("reviews", JSON.stringify(reviews));
+  }, [reviews]);
+
   const addReview = () => {
-    if (!text) return;
+    if (!text.trim()) return;
+
     setReviews([
       ...reviews,
-      { id: Date.now(), text, rating }
+      {
+        id: Date.now(),
+        text: text.trim(),
+        rating: Number(rating),
+      },
     ]);
+
     setText("");
+    setRating(5);
   };
 
   const deleteReview = (id) => {
-    setReviews(reviews.filter(r => r.id !== id));
+    setReviews(reviews.filter((r) => r.id !== id));
   };
 
   const editReview = (id) => {
     const newText = prompt("Edit review:");
-    if (!newText) return;
-    setReviews(reviews.map(r =>
-      r.id === id ? { ...r, text: newText } : r
-    ));
+    if (!newText || !newText.trim()) return;
+
+    setReviews(
+      reviews.map((r) =>
+        r.id === id ? { ...r, text: newText.trim() } : r
+      )
+    );
   };
 
   return (
@@ -40,29 +61,44 @@ function Reviews() {
           className="border p-2 w-full mb-2 rounded"
         />
 
-        <select value={rating} onChange={(e) => setRating(e.target.value)}>
-          {[1,2,3,4,5].map(r => <option key={r}>{r}</option>)}
+        <select
+          value={rating}
+          onChange={(e) => setRating(Number(e.target.value))}
+          className="border p-2 rounded"
+        >
+          {[1, 2, 3, 4, 5].map((r) => (
+            <option key={r} value={r}>
+              {r}
+            </option>
+          ))}
         </select>
 
-        <button onClick={addReview} className="bg-orange-500 text-white px-3 py-1 rounded ml-2">
+        <button
+          onClick={addReview}
+          className="bg-orange-500 text-white px-3 py-1 rounded ml-2"
+        >
           Submit
         </button>
       </div>
 
       {/* LIST */}
-      {reviews.map(r => (
-        <div key={r.id} className="bg-white p-3 mb-2 rounded shadow">
+      {reviews.length === 0 ? (
+        <p className="text-gray-500">No reviews yet</p>
+      ) : (
+        reviews.map((r) => (
+          <div key={r.id} className="bg-white p-3 mb-2 rounded shadow">
 
-          <p>⭐ {r.rating}</p>
-          <p>{r.text}</p>
+            <p>⭐ {r.rating}</p>
+            <p>{r.text}</p>
 
-          <div className="flex gap-2 mt-2">
-            <button onClick={() => editReview(r.id)}>Edit</button>
-            <button onClick={() => deleteReview(r.id)}>Delete</button>
+            <div className="flex gap-2 mt-2">
+              <button onClick={() => editReview(r.id)}>Edit</button>
+              <button onClick={() => deleteReview(r.id)}>Delete</button>
+            </div>
+
           </div>
-
-        </div>
-      ))}
+        ))
+      )}
 
     </div>
   );

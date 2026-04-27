@@ -1,6 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
-function Checkout({ cart, setCart, setPage, setPayments }) {
+function Checkout({ cart, setCart, setPayments }) {
+  const navigate = useNavigate();
+
   const [address, setAddress] = useState("");
   const [payment, setPayment] = useState("cod");
   const [loading, setLoading] = useState(false);
@@ -11,6 +14,13 @@ function Checkout({ cart, setCart, setPage, setPayments }) {
     cvv: ""
   });
 
+  // 🔒 Prevent direct access
+  useEffect(() => {
+    if (!cart || cart.length === 0) {
+      navigate("/customer/cart");
+    }
+  }, [cart, navigate]);
+
   // 💰 Total
   const total = cart.reduce(
     (sum, item) => sum + (item.price || 0) * (item.qty || 1),
@@ -18,18 +28,15 @@ function Checkout({ cart, setCart, setPage, setPayments }) {
   );
 
   const handlePlaceOrder = () => {
-    if (!address) {
+    if (!address.trim()) {
       alert("Enter address ❗");
       return;
     }
 
-    console.log("Placing order...");
-    console.log("Payment:", payment);
-
-    // ✅ SAVE CARD
+    // ✅ Card validation
     if (payment === "card") {
-      if (!cardDetails.number) {
-        alert("Enter card details ❗");
+      if (!cardDetails.number || !cardDetails.expiry || !cardDetails.cvv) {
+        alert("Enter complete card details ❗");
         return;
       }
 
@@ -46,20 +53,35 @@ function Checkout({ cart, setCart, setPage, setPayments }) {
 
       localStorage.setItem("cards", JSON.stringify(updatedCards));
 
-      // ✅ update state if available
       if (setPayments) {
         setPayments(updatedCards);
       }
-
-      console.log("Card saved ✅");
     }
 
     setLoading(true);
 
     setTimeout(() => {
+      // ✅ Save order
+      const orders = JSON.parse(localStorage.getItem("orders")) || [];
+
+      const newOrder = {
+        id: Date.now(),
+        items: cart,
+        total,
+        address,
+        payment,
+        date: new Date().toISOString()
+      };
+
+      localStorage.setItem("orders", JSON.stringify([...orders, newOrder]));
+
+      // 🧹 Clear cart
       setCart([]);
-      setPage("success");
+
       setLoading(false);
+
+      // ✅ Navigate properly
+      navigate("/customer/success");
     }, 800);
   };
 

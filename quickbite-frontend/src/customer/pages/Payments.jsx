@@ -1,24 +1,56 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 function Payments() {
   const [cards, setCards] = useState([]);
   const [cardNumber, setCardNumber] = useState("");
 
+  // 🔁 Load cards
+  useEffect(() => {
+    const saved = JSON.parse(localStorage.getItem("cards")) || [];
+    setCards(saved);
+  }, []);
+
+  // 💾 Save cards
+  useEffect(() => {
+    localStorage.setItem("cards", JSON.stringify(cards));
+  }, [cards]);
+
   const addCard = () => {
-    if (!cardNumber) return;
-    setCards([...cards, { id: Date.now(), number: cardNumber, isDefault: false }]);
+    const clean = cardNumber.replace(/\s/g, "");
+
+    if (clean.length < 12) {
+      alert("Enter valid card number ❗");
+      return;
+    }
+
+    const newCard = {
+      id: Date.now(),
+      number: clean,
+      isDefault: cards.length === 0, // first card auto default
+    };
+
+    setCards([...cards, newCard]);
     setCardNumber("");
   };
 
   const removeCard = (id) => {
-    setCards(cards.filter(c => c.id !== id));
+    const updated = cards.filter((c) => c.id !== id);
+
+    // ensure at least one default
+    if (updated.length > 0 && !updated.some((c) => c.isDefault)) {
+      updated[0].isDefault = true;
+    }
+
+    setCards(updated);
   };
 
   const setDefault = (id) => {
-    setCards(cards.map(c => ({
-      ...c,
-      isDefault: c.id === id
-    })));
+    setCards(
+      cards.map((c) => ({
+        ...c,
+        isDefault: c.id === id,
+      }))
+    );
   };
 
   return (
@@ -34,27 +66,45 @@ function Payments() {
           placeholder="Card Number"
           className="border p-2 flex-1 rounded"
         />
-        <button onClick={addCard} className="bg-orange-500 text-white px-3 rounded">
+        <button
+          onClick={addCard}
+          className="bg-orange-500 text-white px-3 rounded"
+        >
           Add
         </button>
       </div>
 
       {/* LIST */}
-      {cards.map(card => (
-        <div key={card.id} className="bg-white p-3 mb-2 rounded shadow flex justify-between">
+      {cards.length === 0 ? (
+        <p className="text-gray-500">No cards added</p>
+      ) : (
+        cards.map((card) => (
+          <div
+            key={card.id}
+            className="bg-white p-3 mb-2 rounded shadow flex justify-between"
+          >
+            <div>
+              <p>**** **** **** {card.number.slice(-4)}</p>
+              {card.isDefault && (
+                <span className="text-green-500 text-sm">
+                  Default
+                </span>
+              )}
+            </div>
 
-          <div>
-            <p>**** **** **** {card.number.slice(-4)}</p>
-            {card.isDefault && <span className="text-green-500 text-sm">Default</span>}
+            <div className="flex gap-2">
+              {!card.isDefault && (
+                <button onClick={() => setDefault(card.id)}>
+                  Set Default
+                </button>
+              )}
+              <button onClick={() => removeCard(card.id)}>
+                Delete
+              </button>
+            </div>
           </div>
-
-          <div className="flex gap-2">
-            <button onClick={() => setDefault(card.id)}>Set Default</button>
-            <button onClick={() => removeCard(card.id)}>Delete</button>
-          </div>
-
-        </div>
-      ))}
+        ))
+      )}
 
     </div>
   );

@@ -1,4 +1,8 @@
-function OrderSuccess({ setPage }) {
+import { useNavigate } from "react-router-dom";
+
+function OrderSuccess() {
+  const navigate = useNavigate();
+
   return (
     <div className="p-6 text-center">
 
@@ -9,14 +13,14 @@ function OrderSuccess({ setPage }) {
       <p className="mt-2">Your food is on the way 🚀</p>
 
       <button
-        onClick={() => setPage("tracking")}
+        onClick={() => navigate("/customer/order-tracking")}
         className="mt-4 bg-orange-500 text-white px-4 py-2 rounded"
       >
         Track Order
       </button>
 
       <button
-        onClick={() => setPage("home")}
+        onClick={() => navigate("/customer/home")}
         className="mt-2 block mx-auto text-gray-600"
       >
         Back to Home

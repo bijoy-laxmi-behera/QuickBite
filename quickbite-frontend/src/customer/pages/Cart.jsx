@@ -1,32 +1,46 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 
-function Cart({ cart, setCart, setPage }) {
+function Cart({ cart, setCart }) {
+  const navigate = useNavigate();
+
   const [coupon, setCoupon] = useState("");
   const [discount, setDiscount] = useState(0);
 
-  // ➕ Increase
+  // 🔁 Load cart from localStorage
+  useEffect(() => {
+    const savedCart = JSON.parse(localStorage.getItem("cart"));
+    if (savedCart) setCart(savedCart);
+  }, [setCart]);
+
+  // 💾 Save cart to localStorage
+  useEffect(() => {
+    localStorage.setItem("cart", JSON.stringify(cart));
+  }, [cart]);
+
+  // ➕ Increase quantity
   const increase = (item) => {
-    setCart(prev =>
-      prev.map(i =>
+    setCart((prev) =>
+      prev.map((i) =>
         i.id === item.id ? { ...i, qty: i.qty + 1 } : i
       )
     );
   };
 
-  // ➖ Decrease
+  // ➖ Decrease quantity
   const decrease = (item) => {
-    setCart(prev =>
+    setCart((prev) =>
       prev
-        .map(i =>
+        .map((i) =>
           i.id === item.id ? { ...i, qty: i.qty - 1 } : i
         )
-        .filter(i => i.qty > 0)
+        .filter((i) => i.qty > 0)
     );
   };
 
   // ❌ Remove item
   const removeItem = (id) => {
-    setCart(prev => prev.filter(i => i.id !== id));
+    setCart((prev) => prev.filter((i) => i.id !== id));
   };
 
   // 🧹 Clear cart
@@ -38,8 +52,10 @@ function Cart({ cart, setCart, setPage }) {
 
   // 🎟 Apply coupon
   const applyCoupon = () => {
-    if (coupon === "SAVE10") {
-      setDiscount(0.1); // 10%
+    const code = coupon.trim().toUpperCase();
+
+    if (code === "SAVE10") {
+      setDiscount(0.1);
       alert("Coupon applied 🎉");
     } else {
       setDiscount(0);
@@ -47,7 +63,7 @@ function Cart({ cart, setCart, setPage }) {
     }
   };
 
-  // 💰 Totals
+  // 💰 Calculations
   const total = cart.reduce((sum, i) => sum + i.price * i.qty, 0);
   const discountAmount = total * discount;
   const finalTotal = total - discountAmount;
@@ -58,10 +74,10 @@ function Cart({ cart, setCart, setPage }) {
       <h2 className="text-xl font-bold mb-4">Your Cart</h2>
 
       {cart.length === 0 ? (
-        <p>Cart is empty</p>
+        <p className="text-gray-600">Cart is empty</p>
       ) : (
         <>
-          {cart.map(item => (
+          {cart.map((item) => (
             <div
               key={item.id}
               className="bg-white p-4 mb-3 rounded shadow flex justify-between items-center"
@@ -72,16 +88,31 @@ function Cart({ cart, setCart, setPage }) {
               </div>
 
               <div className="flex items-center gap-2">
-                <button onClick={() => decrease(item)} className="px-2">-</button>
+                <button
+                  onClick={() => decrease(item)}
+                  className="px-2 bg-gray-200 rounded"
+                >
+                  -
+                </button>
                 <span>{item.qty}</span>
-                <button onClick={() => increase(item)} className="px-2">+</button>
+                <button
+                  onClick={() => increase(item)}
+                  className="px-2 bg-gray-200 rounded"
+                >
+                  +
+                </button>
               </div>
 
-              <button onClick={() => removeItem(item.id)}>❌</button>
+              <button
+                onClick={() => removeItem(item.id)}
+                className="text-red-500"
+              >
+                ❌
+              </button>
             </div>
           ))}
 
-          {/* COUPON */}
+          {/* 🎟 Coupon */}
           <div className="flex gap-2 mt-4">
             <input
               value={coupon}
@@ -97,7 +128,7 @@ function Cart({ cart, setCart, setPage }) {
             </button>
           </div>
 
-          {/* TOTAL */}
+          {/* 💰 Total */}
           <div className="mt-4 bg-white p-4 rounded shadow">
             <p>Total: ₹{total}</p>
             <p>Discount: ₹{discountAmount.toFixed(2)}</p>
@@ -106,9 +137,8 @@ function Cart({ cart, setCart, setPage }) {
             </h3>
           </div>
 
-          {/* ACTIONS */}
+          {/* 🔘 Actions */}
           <div className="flex gap-3 mt-4">
-
             <button
               onClick={clearCart}
               className="bg-gray-300 px-4 py-2 rounded"
@@ -118,18 +148,16 @@ function Cart({ cart, setCart, setPage }) {
 
             <button
               onClick={() => {
-                console.log("GOING TO CHECKOUT"); // ✅ DEBUG
                 if (cart.length === 0) {
                   alert("Cart is empty ❗");
                   return;
                 }
-                setPage("checkout");
+                navigate("/customer/checkout"); // ✅ FIXED
               }}
               className="bg-orange-500 text-white px-4 py-2 rounded"
             >
               Checkout
             </button>
-
           </div>
         </>
       )}

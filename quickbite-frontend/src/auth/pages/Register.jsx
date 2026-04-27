@@ -58,8 +58,7 @@ function Register() {
       navigate("/login");
     } catch (err) {
       const message =
-        err.response?.data?.message ||
-        "Registration failed. Try again.";
+        err.response?.data?.message || "Registration failed. Try again.";
       setError(message);
     } finally {
       setLoading(false);
@@ -68,7 +67,6 @@ function Register() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-500 via-red-500 to-yellow-400 p-6 relative overflow-hidden">
-
       {/* Background blur shapes */}
       <div className="absolute w-96 h-96 bg-white/20 rounded-full blur-3xl top-10 left-10"></div>
       <div className="absolute w-96 h-96 bg-yellow-300/20 rounded-full blur-3xl bottom-10 right-10"></div>
@@ -89,13 +87,9 @@ function Register() {
             />
           </div>
 
-          <h1 className="text-3xl font-bold text-white">
-            QuickBite
-          </h1>
+          <h1 className="text-3xl font-bold text-white">QuickBite</h1>
 
-          <p className="text-white/80 text-sm mt-2">
-            Create your account
-          </p>
+          <p className="text-white/80 text-sm mt-2">Create your account</p>
         </div>
 
         {/* Error */}
@@ -110,7 +104,6 @@ function Register() {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-
           {/* Full Name */}
           <div className="relative">
             <input
@@ -141,6 +134,30 @@ function Register() {
             <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
               Email
             </label>
+          </div>
+
+          {/* ROLE DROPDOWN */}
+          <div className="relative">
+            <select
+              name="role"
+              value={formData.role}
+              onChange={handleChange}
+              required
+              className="w-full px-4 py-3 bg-white/30 border border-white/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white"
+            >
+              <option value="" disabled className="text-black">
+                Select Role
+              </option>
+              <option value="customer" className="text-black">
+                Customer
+              </option>
+              <option value="vendor" className="text-black">
+                Vendor
+              </option>
+              <option value="delivery" className="text-black">
+                Delivery Partner
+              </option>
+            </select>
           </div>
 
           {/* Password */}
@@ -187,10 +204,7 @@ function Register() {
 
         <p className="text-sm text-white/80 mt-8 text-center">
           Already have an account?{" "}
-          <Link
-            to="/login"
-            className="font-medium text-white hover:underline"
-          >
+          <Link to="/login" className="font-medium text-white hover:underline">
             Login
           </Link>
         </p>

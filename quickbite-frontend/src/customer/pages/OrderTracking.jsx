@@ -1,29 +1,47 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
-function OrderTracking({ setPage }) {
+function OrderTracking() {
+  const navigate = useNavigate();
 
+  const [step, setStep] = useState(1);
+
+  // 🚚 Simulate tracking steps
   useEffect(() => {
-    const timer = setTimeout(() => {
-    console.log("Auto redirect to success");
-      setPage("success");
-    }, 3000);
+    const timers = [
+      setTimeout(() => setStep(2), 1500),
+      setTimeout(() => setStep(3), 3000),
+      setTimeout(() => navigate("/customer/success"), 4500),
+    ];
 
-    return () => clearTimeout(timer);
-  }, [setPage]);
+    return () => timers.forEach(clearTimeout);
+  }, [navigate]);
 
   return (
     <div className="p-6 text-center">
 
-      <h2 className="text-xl font-bold mb-4">
+      <h2 className="text-xl font-bold mb-6">
         Order Tracking 🚚
       </h2>
 
-      <p>Preparing...</p>
-      <p>Out for delivery...</p>
-      <p className="text-green-600 font-semibold">Delivered ✅</p>
+      <div className="space-y-2">
 
-      <p className="text-sm text-gray-500 mt-3">
-        
+        <p className={step >= 1 ? "font-semibold" : "text-gray-400"}>
+          Preparing...
+        </p>
+
+        <p className={step >= 2 ? "font-semibold" : "text-gray-400"}>
+          Out for delivery...
+        </p>
+
+        <p className={step >= 3 ? "text-green-600 font-semibold" : "text-gray-400"}>
+          Delivered ✅
+        </p>
+
+      </div>
+
+      <p className="text-sm text-gray-500 mt-4">
+        Your order is on the way
       </p>
 
     </div>

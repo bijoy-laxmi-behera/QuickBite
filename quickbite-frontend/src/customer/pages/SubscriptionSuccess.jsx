@@ -1,4 +1,8 @@
-function SubscriptionSuccess({ setPage }) {
+import { useNavigate } from "react-router-dom";
+
+function SubscriptionSuccess() {
+  const navigate = useNavigate();
+
   return (
     <div className="flex flex-col items-center justify-center min-h-screen">
 
@@ -11,7 +15,7 @@ function SubscriptionSuccess({ setPage }) {
       </p>
 
       <button
-        onClick={() => setPage("home")}
+        onClick={() => navigate("/customer/home")}
         className="bg-orange-500 text-white px-4 py-2 rounded"
       >
         Back to Home
