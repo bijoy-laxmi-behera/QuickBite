@@ -1,0 +1,124 @@
+const express = require("express");
+const router = express.Router();
+const upload=require("../middleware/upload");
+const { protect, authorize } = require("../middleware/authMiddleware");
+const { 
+  getAllRestaurants,
+  getAllUsers, 
+  getUserById, 
+  updateUser, 
+  deleteUser, 
+  blockUser, 
+  unblockUser, 
+  getUserStats,
+  getMyProfile,
+  updateMyProfile,
+  getRestaurantById,
+  createRestaurant,
+  updateRestaurant,
+  deleteRestaurant,
+  toggleRestaurantStatus,
+  getRestaurantOrders,
+  searchMenuItems,
+  getRestaurantMenu,
+  createMenuItem,
+  updateMenuItem,
+  deleteMenuItem,
+  toggleAvailability,
+  placeOrder,
+  getMyOrders,
+  getOrderById,
+  cancelOrder,
+  getAllOrders,
+  updateOrderStatus,
+  getLiveOrders,
+  getAllAgents,
+  createAgent,
+  updateAgent,
+  deleteAgent,
+  toggleAgentStatus,
+  assignAgentToOrder,
+  getAgentDeliveries,
+  initiatePayment,
+  verifyPayment,
+  getAllPayments,
+  getPaymentSummary,
+  getPaymentById,
+  refundPayment,
+  validateCoupon,
+  getAllCoupons,
+  createCoupon,
+  updateCoupon,
+  deleteCoupon,
+  toggleCoupon,
+  getOverview,
+  getRevenueAnalytics,
+  getOrderAnalytics,
+  getTopRestaurants,
+  getPeakHours,
+  rateOrder,
+  getRestaurantRatings,
+  deleteReview,
+  getSettings,
+  updateSettings,
+} = require("../controllers/adminController");
+router.get("/users",protect,authorize("admin"),getAllUsers);
+router.get("/users/:id",protect,authorize("admin"),getUserById);
+router.put("/users/:id",protect,authorize("admin"),updateUser);
+router.delete("/users/:id",protect,authorize("admin"),deleteUser);
+router.put("/users/:id/block",protect,authorize("admin"),blockUser);
+router.put("/users/:id/unblock",protect,authorize("admin"),unblockUser);
+router.get("/users-stats",protect,authorize("admin"),getUserStats);
+router.get("/me",protect,authorize("admin"),getMyProfile);
+router.put("/me",protect,authorize("admin"),updateMyProfile);
+// RESTAURANTS
+router.get("/",protect,authorize("admin"),getAllRestaurants);
+router.get("/:id",getRestaurantById);
+router.post("/",protect,authorize("admin"),createRestaurant);
+router.put("/:id",protect,authorize("admin"),updateRestaurant);
+router.delete("/:id",protect,authorize("admin"),deleteRestaurant);
+router.patch("/:id/status",protect,authorize("admin"),toggleRestaurantStatus);
+router.get("/:id/orders",protect,authorize("admin"),getRestaurantOrders);
+router.get("/search",searchMenuItems);
+router.get("/:id/menu",getRestaurantMenu);
+router.post("/",protect,authorize("admin"),upload.single("image"),createMenuItem);
+router.put("/:id",protect,authorize("admin"),upload.single("image"),updateMenuItem);
+router.delete("/:id",protect,authorize("admin"),deleteMenuItem);
+router.patch("/:id/availability",protect,authorize("admin"),toggleAvailability);
+router.post("/",protect,placeOrder);
+router.get("/my-orders",protect,getMyOrders);
+router.get("/:id",protect,getOrderById);
+router.patch("/:id/cancel",protect,cancelOrder);
+router.get("/admin/orders",protect,authorize("admin"),getAllOrders);
+router.patch("/admin/orders/:id/status",protect,authorize("admin"),updateOrderStatus);
+router.get("/admin/orders/live",protect,authorize("admin"),getLiveOrders);
+router.get("/agents",protect,authorize("admin"),getAllAgents);
+router.post("/agents",protect,authorize("admin"),createAgent);
+router.put("/agents/:id",protect,authorize("admin"),updateAgent);
+router.delete("/agents/:id",protect,authorize("admin"),deleteAgent);
+router.patch("/agents/:id/status",protect,authorize("admin"),toggleAgentStatus);
+router.post("/orders/:id/assign-agent",protect,authorize("admin"),assignAgentToOrder);
+router.get("/agents/:id/deliveries",protect,authorize("admin"),getAgentDeliveries);
+router.post("/initiate",protect,initiatePayment);
+router.post("/verify",protect,verifyPayment);
+router.get("/",protect,authorize("admin"),getAllPayments);
+router.get("/summary",protect,authorize("admin"),getPaymentSummary);
+router.get("/:id",protect,authorize("admin"),getPaymentById);
+router.post("/:id/refund",protect,authorize("admin"),refundPayment);
+router.get("/validate",protect,validateCoupon);
+router.get("/",protect,authorize("admin"),getAllCoupons);
+router.post("/",protect,authorize("admin"),createCoupon);
+router.put("/:id",protect,authorize("admin"),updateCoupon);
+router.delete("/:id",protect,authorize("admin"),deleteCoupon);
+router.patch("/:id/toggle",protect,authorize("admin"),toggleCoupon);
+router.get("/overview",getOverview);
+router.get("/revenue",getRevenueAnalytics);
+router.get("/orders",getOrderAnalytics);
+router.get("/restaurants",getTopRestaurants);
+router.get("/peak-hours",getPeakHours);
+router.post("/orders/:id/rate",protect,rateOrder);
+router.get("/restaurants/:id/ratings",getRestaurantRatings);
+router.delete("/admin/ratings/:id",protect,authorize("admin"),deleteReview);
+router.get("/",protect,authorize("admin"),getSettings);
+router.put("/",protect,authorize("admin"),updateSettings);
+module.exports = router;
