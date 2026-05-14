@@ -1,6 +1,7 @@
 import { FaCheckCircle } from "react-icons/fa";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import landingVideo from "../assets/landing.mp4";
 
 const images = [
   "https://images.unsplash.com/photo-1600891964599-f61ba0e24092",
@@ -41,8 +42,6 @@ export default function Hero() {
 
   return (
     <section className="relative min-h-[90vh] flex items-center overflow-hidden">
-
-
       {/* 🎥 Background Video */}
       <video
         autoPlay
@@ -51,10 +50,7 @@ export default function Hero() {
         playsInline
         className="absolute inset-0 w-full h-full object-cover"
       >
-        <source
-          src="https://videos.pexels.com/video-files/854180/854180-hd_1920_1080_25fps.mp4"
-          type="video/mp4"
-        />
+        <source src={landingVideo} type="video/mp4" />
       </video>
 
       {/* Overlay */}
@@ -62,7 +58,6 @@ export default function Hero() {
 
       {/* Content */}
       <div className="relative z-10 max-w-7xl mx-auto px-6 lg:px-20 grid lg:grid-cols-2 gap-16 items-center text-white">
-
         {/* LEFT */}
         <div>
           <span className="inline-block bg-white/10 backdrop-blur text-orange-400 text-xs font-bold px-4 py-2 rounded-full tracking-wider">
@@ -77,8 +72,8 @@ export default function Hero() {
           </h1>
 
           <p className="mt-6 text-gray-200 text-lg max-w-lg">
-            Discover curated restaurants, flexible meal subscriptions,
-            and lightning-fast delivery — built for your lifestyle.
+            Discover curated restaurants, flexible meal subscriptions, and
+            lightning-fast delivery — built for your lifestyle.
           </p>
 
           {/* CTA */}
@@ -132,7 +127,6 @@ export default function Hero() {
             ))}
           </div>
         </div>
-
       </div>
     </section>
   );

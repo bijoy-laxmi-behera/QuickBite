@@ -29,20 +29,20 @@ const updateProfile = async (req, res) => {
   try {
     const { name, email, phone, vehicleType } = req.body;
     const user = await User.findById(req.user.id);
-    
+
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     user.name = name || user.name;
     user.email = email || user.email;
     user.phone = phone || user.phone;
-    
+
     if (vehicleType) {
       user.vehicle = user.vehicle || {};
       user.vehicle.type = vehicleType;
     }
-    
+
     await user.save();
     res.json({ success: true, message: "Profile updated", data: user });
   } catch (error) {
@@ -55,12 +55,12 @@ const updateAvatar = async (req, res) => {
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No file uploaded" });
     }
-    
+
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     user.avatar = req.file.path;
     await user.save();
     res.json({ success: true, message: "Avatar updated", data: { avatar: user.avatar } });
@@ -75,14 +75,14 @@ const uploadDocuments = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     user.documents = {
       ...user.documents,
       license: req.files?.license?.[0]?.path || user.documents?.license,
       rc: req.files?.rc?.[0]?.path || user.documents?.rc,
       idProof: req.files?.idProof?.[0]?.path || user.documents?.idProof,
     };
-    
+
     await user.save();
     res.json({ success: true, message: "Documents uploaded", data: user.documents });
   } catch (error) {
@@ -94,17 +94,17 @@ const updateVehicle = async (req, res) => {
   try {
     const { type, number, model } = req.body;
     const user = await User.findById(req.user.id);
-    
+
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     user.vehicle = {
       type: type || user.vehicle?.type,
       number: number || user.vehicle?.number,
       model: model || user.vehicle?.model,
     };
-    
+
     await user.save();
     res.json({ success: true, message: "Vehicle updated", data: user.vehicle });
   } catch (error) {
@@ -116,17 +116,17 @@ const updateBank = async (req, res) => {
   try {
     const { accountNumber, ifsc, accountHolderName } = req.body;
     const user = await User.findById(req.user.id);
-    
+
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     user.bank = {
       accountNumber,
       ifsc,
       accountHolderName,
     };
-    
+
     await user.save();
     res.json({ success: true, message: "Bank details updated", data: user.bank });
   } catch (error) {
@@ -140,7 +140,7 @@ const deleteAccount = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     await user.deleteOne();
     res.json({ success: true, message: "Account deleted successfully" });
   } catch (error) {
@@ -156,7 +156,7 @@ const toggleStatus = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     user.isOnline = !user.isOnline;
     await user.save();
     res.json({ success: true, message: "Status updated", data: { isOnline: user.isOnline } });
@@ -171,7 +171,7 @@ const getStatus = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     res.json({ success: true, data: { isOnline: user.isOnline } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -185,22 +185,22 @@ const updateLocation = async (req, res) => {
     let { lat, lng } = req.body;
     lat = parseFloat(lat);
     lng = parseFloat(lng);
-    
+
     if (!lat || !lng) {
       return res.status(400).json({ success: false, message: "Invalid coordinates" });
     }
-    
+
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     user.location = {
       type: "Point",
       coordinates: [lng, lat],
       updatedAt: new Date()
     };
-    
+
     await user.save();
     res.json({ success: true, message: "Location updated", data: user.location });
   } catch (error) {
@@ -214,7 +214,7 @@ const getLocation = async (req, res) => {
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     res.json({ success: true, data: { location: user.location } });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -225,13 +225,19 @@ const getLocation = async (req, res) => {
 
 const getIncomingOrders = async (req, res) => {
   try {
+    // DEBUG: check what's actually in DB
+    const allOrders = await Order.find({}).select("status deliveryStatus deliveryPartner deliveryAgent orderId").lean();
+    console.log("ALL ORDERS IN DB:", JSON.stringify(allOrders, null, 2));
+
     const orders = await Order.find({ 
       deliveryStatus: "pending",
-      status: { $ne: "cancelled" }
+      status: { $in: ["pending", "confirmed", "preparing"] },
     })
       .populate("user", "name phone")
       .populate("vendor", "name address phone")
       .sort({ createdAt: -1 });
+    
+    console.log("FILTERED ORDERS:", orders.length);
     
     res.json({ success: true, count: orders.length, orders });
   } catch (error) {
@@ -242,12 +248,15 @@ const getIncomingOrders = async (req, res) => {
 const getActiveOrder = async (req, res) => {
   try {
     const order = await Order.findOne({
-      deliveryAgent: req.user.id,
+      $or: [
+        { deliveryAgent: req.user.id },
+        { deliveryPartner: req.user.id }
+      ],
       deliveryStatus: { $in: ["accepted", "picked_up"] }
     })
       .populate("user", "name phone")
       .populate("vendor", "name address phone location");
-    
+
     res.json({ success: true, data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -260,11 +269,11 @@ const getOrderById = async (req, res) => {
       .populate("user", "name phone email")
       .populate("vendor", "name address phone location cuisine")
       .populate("items.menuItem", "name price image isveg");
-    
+
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    
+
     res.json({ success: true, data: order });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -275,38 +284,39 @@ const acceptOrder = async (req, res) => {
     console.log("=== ACCEPT ORDER DEBUG ===");
     console.log("Order ID:", req.params.id);
     console.log("Delivery Agent ID:", req.user.id);
-    
+
     const order = await Order.findById(req.params.id);
-    
+
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    
+
     console.log("Current order status:", order.deliveryStatus);
-    
+
     if (order.deliveryStatus !== "pending") {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Order cannot be accepted. Current status: ${order.deliveryStatus}` 
+      return res.status(400).json({
+        success: false,
+        message: `Order cannot be accepted. Current status: ${order.deliveryStatus}`
       });
     }
-    
+
     // Update order
-    order.deliveryAgent = req.user.id;
+    order.deliveryPartner = req.user.id;
+    order.deliveryAgent = req.user.id;   // keep for backward compat
     order.deliveryStatus = "accepted";
     order.acceptedAt = new Date();
-    
+
     await order.save();
-    
+
     console.log("Order accepted. New status:", order.deliveryStatus);
     console.log("Delivery agent saved:", order.deliveryAgent);
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: "Order accepted successfully",
-      data: order 
+      data: order
     });
-    
+
   } catch (error) {
     console.error("Error in acceptOrder:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -316,15 +326,15 @@ const rejectOrder = async (req, res) => {
   try {
     const { reason } = req.body;
     const order = await Order.findById(req.params.id);
-    
+
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    
+
     order.deliveryStatus = "rejected";
     order.rejectionReason = reason;
     await order.save();
-    
+
     res.json({ success: true, message: "Order rejected" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -335,41 +345,41 @@ const markPickedUp = async (req, res) => {
     console.log("=== MARK PICKED UP DEBUG ===");
     console.log("Order ID:", req.params.id);
     console.log("Delivery Agent ID:", req.user.id);
-    
+
     const order = await Order.findById(req.params.id);
-    
+
     if (!order) {
       console.log("Order not found");
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    
+
     console.log("Current order status:", order.deliveryStatus);
     console.log("Order delivery agent:", order.deliveryAgent);
-    
+
     // Skip the delivery agent check for now (temporarily disable)
     // Just check if order is in accepted state
     if (order.deliveryStatus !== "accepted") {
       console.log("Invalid status for pickup:", order.deliveryStatus);
-      return res.status(400).json({ 
-        success: false, 
-        message: `Order cannot be picked up. Current status: ${order.deliveryStatus}. Expected: accepted` 
+      return res.status(400).json({
+        success: false,
+        message: `Order cannot be picked up. Current status: ${order.deliveryStatus}. Expected: accepted`
       });
     }
-    
+
     // Update order status
     order.deliveryStatus = "picked_up";
     order.pickedAt = new Date();
-    
+
     // If delivery agent is not set, set it now
     if (!order.deliveryAgent) {
       order.deliveryAgent = req.user.id;
       console.log("Setting delivery agent to:", req.user.id);
     }
-    
+
     await order.save();
-    
+
     console.log("Order updated successfully. New status:", order.deliveryStatus);
-    
+
     // Send notification to customer (optional - comment out if Notification model has issues)
     try {
       await Notification.create({
@@ -382,13 +392,13 @@ const markPickedUp = async (req, res) => {
     } catch (notifError) {
       console.error("Notification error (non-critical):", notifError);
     }
-    
-    res.json({ 
-      success: true, 
+
+    res.json({
+      success: true,
       message: "Order picked up successfully",
-      data: order 
+      data: order
     });
-    
+
   } catch (error) {
     console.error("Error in markPickedUp:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -398,20 +408,20 @@ const verifyOtp = async (req, res) => {
   try {
     const { otp } = req.body;
     const order = await Order.findById(req.params.id);
-    
+
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    
+
     // Check if OTP exists
     if (!order.otp) {
       return res.status(400).json({ success: false, message: "OTP not generated for this order" });
     }
-    
+
     if (order.otp !== otp) {
       return res.status(400).json({ success: false, message: "Invalid OTP" });
     }
-    
+
     res.json({ success: true, message: "OTP verified" });
   } catch (error) {
     console.error("OTP verification error:", error);
@@ -421,39 +431,39 @@ const verifyOtp = async (req, res) => {
 const markDelivered = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id);
-    
+
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    
+
     // FIXED: Check if deliveryAgent exists before comparing
     if (!order.deliveryAgent) {
       // If no delivery agent assigned, assign the current user
       order.deliveryAgent = req.user.id;
     }
-    
+
     // Now safe to compare
     if (order.deliveryAgent.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
-    
+
     // Check if order is in correct state
     if (order.deliveryStatus !== "picked_up") {
-      return res.status(400).json({ 
-        success: false, 
-        message: `Order cannot be delivered. Current status: ${order.deliveryStatus}` 
+      return res.status(400).json({
+        success: false,
+        message: `Order cannot be delivered. Current status: ${order.deliveryStatus}`
       });
     }
-    
+
     order.deliveryStatus = "delivered";
     order.status = "delivered";
     order.deliveredAt = new Date();
     await order.save();
-    
+
     // Add earnings to wallet
     const earnings = order.deliveryFee || 40;
     await addEarningsToWallet(order, req.user.id, earnings);
-    
+
     // Send notification to customer
     try {
       await Notification.create({
@@ -466,9 +476,9 @@ const markDelivered = async (req, res) => {
     } catch (notifError) {
       console.error("Notification error (non-critical):", notifError);
     }
-    
+
     res.json({ success: true, message: "Order delivered successfully", data: order });
-    
+
   } catch (error) {
     console.error("Error marking delivered:", error);
     res.status(500).json({ success: false, message: error.message });
@@ -478,14 +488,14 @@ const reportIssue = async (req, res) => {
   try {
     const { issue } = req.body;
     const order = await Order.findById(req.params.id);
-    
+
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    
+
     order.issue = issue;
     await order.save();
-    
+
     res.json({ success: true, message: "Issue reported" });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -499,26 +509,26 @@ const getOrderHistory = async (req, res) => {
       deliveryAgent: req.user.id,
       deliveryStatus: "delivered"
     };
-    
+
     if (startDate && endDate) {
       filter.createdAt = {
         $gte: new Date(startDate),
         $lte: new Date(endDate),
       };
     }
-    
+
     const orders = await Order.find(filter)
       .populate("user", "name phone")
       .populate("vendor", "name")
       .sort({ createdAt: -1 })
       .skip((parseInt(page) - 1) * parseInt(limit))
       .limit(parseInt(limit));
-    
+
     const total = await Order.countDocuments(filter);
-    
-    res.json({ 
-      success: true, 
-      count: orders.length, 
+
+    res.json({
+      success: true,
+      count: orders.length,
       orders,
       pagination: { total, page: parseInt(page), limit: parseInt(limit) }
     });
@@ -532,7 +542,7 @@ const getOrderHistory = async (req, res) => {
 const getEarningsSummary = async (req, res) => {
   try {
     const userId = req.user.id;
-    
+
     const result = await Transaction.aggregate([
       { $match: { user: userId, status: "success", type: "delivery_earning" } },
       {
@@ -543,10 +553,10 @@ const getEarningsSummary = async (req, res) => {
         },
       },
     ]);
-    
+
     const totalEarnings = result[0]?.totalEarnings || 0;
     const totalTrips = result[0]?.totalTrips || 0;
-    
+
     res.json({
       success: true,
       totalEarnings,
@@ -563,16 +573,16 @@ const getTodayEarnings = async (req, res) => {
     const userId = req.user.id;
     const start = new Date();
     start.setHours(0, 0, 0, 0);
-    
+
     const earnings = await Transaction.find({
       user: userId,
       createdAt: { $gte: start },
       status: "success",
       type: "delivery_earning"
     }).populate("order");
-    
+
     const total = earnings.reduce((sum, t) => sum + t.amount, 0);
-    
+
     res.json({
       success: true,
       count: earnings.length,
@@ -590,7 +600,7 @@ const getWeeklyEarnings = async (req, res) => {
     const last7Days = new Date();
     last7Days.setDate(last7Days.getDate() - 6);
     last7Days.setHours(0, 0, 0, 0);
-    
+
     const data = await Transaction.aggregate([
       {
         $match: {
@@ -613,7 +623,7 @@ const getWeeklyEarnings = async (req, res) => {
       },
       { $sort: { "_id.year": 1, "_id.month": 1, "_id.day": 1 } },
     ]);
-    
+
     res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -623,7 +633,7 @@ const getWeeklyEarnings = async (req, res) => {
 const getMonthlyEarnings = async (req, res) => {
   try {
     const userId = req.user.id;
-    
+
     const data = await Transaction.aggregate([
       { $match: { user: userId, status: "success", type: "delivery_earning" } },
       {
@@ -638,7 +648,7 @@ const getMonthlyEarnings = async (req, res) => {
       },
       { $sort: { "_id.year": 1, "_id.month": 1 } },
     ]);
-    
+
     res.json({ success: true, data });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -650,7 +660,7 @@ const getPayouts = async (req, res) => {
     const payouts = await Payout.find({
       vendor: req.user.id,
     }).sort({ createdAt: -1 });
-    
+
     res.json({
       success: true,
       count: payouts.length,
@@ -671,9 +681,9 @@ const getTransactions = async (req, res) => {
       .sort({ createdAt: -1 })
       .skip((parseInt(page) - 1) * parseInt(limit))
       .limit(parseInt(limit));
-    
+
     const total = await Transaction.countDocuments({ user: req.user.id });
-    
+
     res.json({
       success: true,
       count: transactions.length,
@@ -690,21 +700,21 @@ const getTransactions = async (req, res) => {
 const getStats = async (req, res) => {
   try {
     const userId = req.user.id;
-    
+
     const totalAssigned = await Order.countDocuments({
       deliveryAgent: userId,
     });
-    
+
     const completed = await Order.countDocuments({
       deliveryAgent: userId,
       deliveryStatus: "delivered",
     });
-    
+
     const accepted = await Order.countDocuments({
       deliveryAgent: userId,
       deliveryStatus: { $in: ["accepted", "picked_up", "delivered"] },
     });
-    
+
     // Avg delivery time (from accepted to delivered)
     const avgTimeData = await Order.aggregate([
       {
@@ -732,7 +742,7 @@ const getStats = async (req, res) => {
         },
       },
     ]);
-    
+
     // Rating
     const ratingData = await Review.aggregate([
       {
@@ -747,7 +757,7 @@ const getStats = async (req, res) => {
         },
       },
     ]);
-    
+
     res.json({
       success: true,
       rating: ratingData[0]?.avgRating || 0,
@@ -767,9 +777,9 @@ const getRatings = async (req, res) => {
     })
       .populate("user", "name avatar")
       .sort({ createdAt: -1 });
-    
+
     const avgRating = reviews.reduce((sum, r) => sum + r.rating, 0) / (reviews.length || 1);
-    
+
     res.json({
       success: true,
       count: reviews.length,
@@ -787,26 +797,26 @@ const getBadges = async (req, res) => {
       deliveryAgent: req.user.id,
       deliveryStatus: "delivered",
     });
-    
+
     const rating = await Review.aggregate([
       { $match: { vendor: req.user.id } },
       { $group: { _id: null, avgRating: { $avg: "$rating" } } }
     ]);
     const avgRating = rating[0]?.avgRating || 0;
-    
+
     const badges = [];
-    
+
     if (completed >= 10) badges.push({ name: "Rookie Rider", earned: true, earnedDate: null });
     if (completed >= 50) badges.push({ name: "Pro Rider", earned: true, earnedDate: null });
     if (completed >= 100) badges.push({ name: "Elite Rider", earned: true, earnedDate: null });
     if (avgRating >= 4.8 && completed >= 20) badges.push({ name: "Gold Star", earned: true, earnedDate: null });
     if (completed >= 200) badges.push({ name: "Legend", earned: true, earnedDate: null });
-    
+
     // Add locked badges
     if (completed < 10) badges.push({ name: "Rookie Rider", earned: false, requirement: "Complete 10 deliveries", progress: (completed / 10) * 100 });
     if (completed < 50 && completed >= 10) badges.push({ name: "Pro Rider", earned: false, requirement: "Complete 50 deliveries", progress: (completed / 50) * 100 });
     if (completed < 100 && completed >= 50) badges.push({ name: "Elite Rider", earned: false, requirement: "Complete 100 deliveries", progress: (completed / 100) * 100 });
-    
+
     res.json({
       success: true,
       totalDeliveries: completed,
@@ -851,7 +861,7 @@ const getLeaderboard = async (req, res) => {
         },
       },
     ]);
-    
+
     res.json({ success: true, data: leaderboard });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -865,7 +875,7 @@ const getNotifications = async (req, res) => {
     const notifications = await Notification.find({
       user: req.user.id,
     }).sort({ createdAt: -1 });
-    
+
     res.json({
       success: true,
       count: notifications.length,
@@ -879,15 +889,15 @@ const getNotifications = async (req, res) => {
 const markAsRead = async (req, res) => {
   try {
     const notification = await Notification.findById(req.params.id);
-    
+
     if (!notification) {
       return res.status(404).json({ success: false, message: "Not found" });
     }
-    
+
     if (notification.user.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
-    
+
     notification.isRead = true;
     await notification.save();
     res.json({ success: true, message: "Marked as read" });
@@ -912,11 +922,11 @@ const saveFcmToken = async (req, res) => {
   try {
     const { token } = req.body;
     const user = await User.findById(req.user.id);
-    
+
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     user.fcmToken = token;
     await user.save();
     res.json({ success: true, message: "FCM token saved" });
@@ -928,16 +938,16 @@ const saveFcmToken = async (req, res) => {
 const updatePreferences = async (req, res) => {
   try {
     const user = await User.findById(req.user.id);
-    
+
     if (!user) {
       return res.status(404).json({ success: false, message: "User not found" });
     }
-    
+
     user.notificationPreferences = {
       ...user.notificationPreferences,
       ...req.body,
     };
-    
+
     await user.save();
     res.json({ success: true, message: "Preferences updated", data: user.notificationPreferences });
   } catch (error) {
@@ -959,18 +969,18 @@ const getFAQs = async (req, res) => {
 const createTicket = async (req, res) => {
   try {
     const { subject, message } = req.body;
-    
+
     if (!subject || !message) {
       return res.status(400).json({ success: false, message: "Subject and message are required" });
     }
-    
+
     const ticket = await SupportTicket.create({
       user: req.user.id,
       subject,
       message,
       status: "open",
     });
-    
+
     res.status(201).json({ success: true, message: "Ticket created", data: ticket });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -982,7 +992,7 @@ const getMyTickets = async (req, res) => {
     const tickets = await SupportTicket.find({
       user: req.user.id,
     }).sort({ createdAt: -1 });
-    
+
     res.json({ success: true, count: tickets.length, tickets });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -992,15 +1002,15 @@ const getMyTickets = async (req, res) => {
 const getTicketById = async (req, res) => {
   try {
     const ticket = await SupportTicket.findById(req.params.id);
-    
+
     if (!ticket) {
       return res.status(404).json({ success: false, message: "Ticket not found" });
     }
-    
+
     if (ticket.user.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
-    
+
     res.json({ success: true, data: ticket });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -1010,30 +1020,30 @@ const updateOrderLocation = async (req, res) => {
   try {
     const { orderId } = req.params;
     const { lat, lng, status } = req.body;
-    
+
     const order = await Order.findById(orderId);
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    
+
     // Verify delivery partner owns this order
     if (order.deliveryAgent.toString() !== req.user.id) {
       return res.status(403).json({ success: false, message: "Unauthorized" });
     }
-    
+
     // Update delivery location
     order.deliveryLocation = {
       lat,
       lng,
       updatedAt: new Date()
     };
-    
+
     if (status) {
       order.deliveryStatus = status;
     }
-    
+
     await order.save();
-    
+
     // Emit socket event for customer tracking
     const io = req.app.get('io');
     if (io) {
@@ -1044,7 +1054,7 @@ const updateOrderLocation = async (req, res) => {
         estimatedArrival: order.estimatedArrival
       });
     }
-    
+
     res.json({ success: true, message: "Location updated" });
   } catch (error) {
     console.error("Error updating order location:", error);
@@ -1056,19 +1066,19 @@ const updateOrderLocation = async (req, res) => {
 const getTrackingInfo = async (req, res) => {
   try {
     const { orderId } = req.params;
-    
+
     const order = await Order.findById(orderId)
       .populate("deliveryAgent", "name phone avatar")
       .populate("vendor", "name address location");
-    
+
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    
+
     // Calculate ETA based on distance
     let eta = order.estimatedArrival;
     let distance = null;
-    
+
     if (order.deliveryLocation && order.customerLocation) {
       distance = calculateDistance(
         order.deliveryLocation.lat,
@@ -1078,7 +1088,7 @@ const getTrackingInfo = async (req, res) => {
       );
       eta = Math.ceil(distance * 3); // ~3 minutes per km
     }
-    
+
     res.json({
       success: true,
       data: {
@@ -1105,10 +1115,10 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
   const R = 6371; // Earth's radius in km
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
-            Math.cos(lat1 * Math.PI/180) * Math.cos(lat2 * Math.PI/180) *
-            Math.sin(dLon/2) * Math.sin(dLon/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return R * c;
 };
 // ==================== WALLET CONTROLLERS ====================
@@ -1117,7 +1127,7 @@ const calculateDistance = (lat1, lon1, lat2, lon2) => {
 const getWallet = async (req, res) => {
   try {
     let wallet = await Wallet.findOne({ user: req.user.id });
-    
+
     if (!wallet) {
       wallet = await Wallet.create({
         user: req.user.id,
@@ -1127,7 +1137,7 @@ const getWallet = async (req, res) => {
         totalWithdrawn: 0
       });
     }
-    
+
     res.json({ success: true, data: wallet });
   } catch (error) {
     console.error("Error fetching wallet:", error);
@@ -1140,19 +1150,19 @@ const getWalletTransactions = async (req, res) => {
   try {
     const { limit = 50, page = 1, type } = req.query;
     const filter = { user: req.user.id };
-    
+
     if (type && type !== 'all') {
       filter.type = type;
     }
-    
+
     const transactions = await Transaction.find(filter)
       .populate("order", "orderId totalAmount")
       .sort({ createdAt: -1 })
       .skip((parseInt(page) - 1) * parseInt(limit))
       .limit(parseInt(limit));
-    
+
     const total = await Transaction.countDocuments(filter);
-    
+
     res.json({
       success: true,
       data: transactions,
@@ -1168,17 +1178,17 @@ const getWalletTransactions = async (req, res) => {
 const requestWithdrawal = async (req, res) => {
   try {
     const { amount, paymentMethod, upiId, bankDetails } = req.body;
-    
+
     if (!amount || amount < 50) {
       return res.status(400).json({ success: false, message: "Minimum withdrawal amount is ₹50" });
     }
-    
+
     // Get wallet
     const wallet = await Wallet.findOne({ user: req.user.id });
     if (!wallet || wallet.balance < amount) {
       return res.status(400).json({ success: false, message: "Insufficient balance" });
     }
-    
+
     // Create withdrawal request
     const withdrawalRequest = await WithdrawalRequest.create({
       user: req.user.id,
@@ -1188,12 +1198,12 @@ const requestWithdrawal = async (req, res) => {
       bankDetails: paymentMethod === 'bank' ? bankDetails : undefined,
       status: "pending"
     });
-    
+
     // Deduct from wallet balance and add to pending
     wallet.balance -= amount;
     wallet.pendingBalance += amount;
     await wallet.save();
-    
+
     // Create transaction record
     await Transaction.create({
       user: req.user.id,
@@ -1204,7 +1214,7 @@ const requestWithdrawal = async (req, res) => {
       reference: withdrawalRequest._id,
       paymentMethod
     });
-    
+
     res.json({
       success: true,
       message: "Withdrawal request submitted successfully",
@@ -1221,7 +1231,7 @@ const getWithdrawalRequests = async (req, res) => {
   try {
     const requests = await WithdrawalRequest.find({ user: req.user.id })
       .sort({ createdAt: -1 });
-    
+
     res.json({ success: true, data: requests });
   } catch (error) {
     console.error("Error fetching withdrawal requests:", error);
@@ -1233,19 +1243,19 @@ const getWithdrawalRequests = async (req, res) => {
 const cancelWithdrawal = async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const request = await WithdrawalRequest.findOne({ _id: id, user: req.user.id });
     if (!request) {
       return res.status(404).json({ success: false, message: "Request not found" });
     }
-    
+
     if (request.status !== "pending") {
       return res.status(400).json({ success: false, message: "Cannot cancel this request" });
     }
-    
+
     request.status = "cancelled";
     await request.save();
-    
+
     // Refund to wallet
     const wallet = await Wallet.findOne({ user: req.user.id });
     if (wallet) {
@@ -1253,13 +1263,13 @@ const cancelWithdrawal = async (req, res) => {
       wallet.pendingBalance -= request.amount;
       await wallet.save();
     }
-    
+
     // Update transaction status
     await Transaction.findOneAndUpdate(
       { reference: id, type: "debit" },
       { status: "failed" }
     );
-    
+
     res.json({ success: true, message: "Withdrawal request cancelled" });
   } catch (error) {
     console.error("Error cancelling withdrawal:", error);
@@ -1280,12 +1290,12 @@ const addEarningsToWallet = async (orderId, deliveryPartnerId, amount) => {
         totalWithdrawn: 0
       });
     }
-    
+
     wallet.balance += amount;
     wallet.totalEarned += amount;
     wallet.lastTransactionAt = new Date();
     await wallet.save();
-    
+
     await Transaction.create({
       user: deliveryPartnerId,
       order: orderId,
@@ -1295,7 +1305,7 @@ const addEarningsToWallet = async (orderId, deliveryPartnerId, amount) => {
       description: `Delivery earning for order`,
       reference: orderId
     });
-    
+
     return true;
   } catch (error) {
     console.error("Error adding earnings to wallet:", error);
@@ -1308,12 +1318,12 @@ const resendOtp = async (req, res) => {
     if (!order) {
       return res.status(404).json({ success: false, message: "Order not found" });
     }
-    
+
     const customer = await User.findById(order.user);
     if (!customer) {
       return res.status(404).json({ success: false, message: "Customer not found" });
     }
-    
+
     // Create email HTML
     const emailHtml = `
       <div style="font-family: Arial, sans-serif; padding: 20px;">
@@ -1322,9 +1332,9 @@ const resendOtp = async (req, res) => {
         <p>Please share this OTP with the delivery partner.</p>
       </div>
     `;
-    
+
     await sendEmail(customer.email, `Your OTP for Order #${order.orderId}`, emailHtml);
-    
+
     res.json({ success: true, message: "OTP resent successfully" });
   } catch (error) {
     console.error("Error resending OTP:", error);

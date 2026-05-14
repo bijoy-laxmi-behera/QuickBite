@@ -20,15 +20,15 @@ const getAllUsers = async (req, res) => {
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 10;
     const skip = (page - 1) * limit;
-    
+
     const users = await User.find()
       .select("-password")
       .skip(skip)
       .limit(limit)
       .sort({ createdAt: -1 });
-      
+
     const total = await User.countDocuments();
-    
+
     res.status(200).json({
       success: true,
       total,
@@ -143,7 +143,9 @@ const updateMyProfile = async (req, res) => {
 // ============ RESTAURANT CONTROLLERS ============
 const getAllRestaurants = async (req, res) => {
   try {
-    const restaurants = await Restaurant.find().sort({ createdAt: -1 });
+    const restaurants = await Restaurant.find()
+      .populate('owner', 'name email phone')  // ← ADD THIS LINE
+      .sort({ createdAt: -1 });
     res.json(restaurants);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -152,7 +154,8 @@ const getAllRestaurants = async (req, res) => {
 
 const getRestaurantById = async (req, res) => {
   try {
-    const restaurant = await Restaurant.findById(req.params.id);
+    const restaurant = await Restaurant.findById(req.params.id)
+      .populate('owner', 'name email phone');
     if (!restaurant) return res.status(404).json({ message: "Restaurant not found" });
     res.json(restaurant);
   } catch (error) {
@@ -210,7 +213,7 @@ const getPendingRestaurants = async (req, res) => {
     const pendingRestaurants = await Restaurant.find({ isApproved: false })
       .populate('owner', 'name email phone')
       .sort({ createdAt: -1 });
-    
+
     res.json({
       success: true,
       data: pendingRestaurants
@@ -226,10 +229,10 @@ const approveRestaurant = async (req, res) => {
     if (!restaurant) {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
-    
+
     restaurant.isApproved = true;
     await restaurant.save();
-    
+
     const vendor = await User.findById(restaurant.owner);
     if (vendor && vendor.email) {
       try {
@@ -247,7 +250,7 @@ const approveRestaurant = async (req, res) => {
         console.error('Email send failed:', emailError);
       }
     }
-    
+
     res.json({ success: true, message: 'Restaurant approved successfully', data: restaurant });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -261,11 +264,11 @@ const rejectRestaurant = async (req, res) => {
     if (!restaurant) {
       return res.status(404).json({ success: false, message: 'Restaurant not found' });
     }
-    
+
     restaurant.isApproved = false;
     restaurant.rejectionReason = reason;
     await restaurant.save();
-    
+
     const vendor = await User.findById(restaurant.owner);
     if (vendor && vendor.email) {
       try {
@@ -284,7 +287,7 @@ const rejectRestaurant = async (req, res) => {
         console.error('Email send failed:', emailError);
       }
     }
-    
+
     res.json({ success: true, message: 'Restaurant rejected' });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message });
@@ -581,14 +584,14 @@ const getPaymentSummary = async (req, res) => {
       { $match: { paymentStatus: "paid", status: "delivered" } },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ]);
-    
+
     const totalTransactions = await Order.countDocuments({ paymentStatus: { $exists: true } });
     const successfulPayments = await Order.countDocuments({ paymentStatus: "paid" });
     const refundedAmount = await Order.aggregate([
       { $match: { paymentStatus: "refunded" } },
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ]);
-    
+
     res.json({
       totalRevenue: totalRevenue[0]?.total || 0,
       totalTransactions,

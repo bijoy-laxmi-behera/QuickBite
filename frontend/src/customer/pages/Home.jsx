@@ -313,7 +313,7 @@ const handleAddToCart = async (dish, e) => {
         </div>
 
         {/* SUBSCRIPTION */}
-        <SubscriptionSection />
+        <SubscriptionSection setPage={setPage} />
 
         {/* ─── POPULAR DISHES ─── */}
         <div className="mt-8 mb-6">

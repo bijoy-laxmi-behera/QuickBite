@@ -53,10 +53,8 @@ const register = async (req, res) => {
     };
 
     if (role === "delivery") {
-      userData.vehicle = {
-        type: vehicle || "",
-        number: licensePlate || "",
-      };
+      userData.vehicle = vehicle || "";
+      userData.licensePlate = licensePlate || "";
     }
 
     if (role === "vendor") {
@@ -73,7 +71,7 @@ const register = async (req, res) => {
     if (role === "vendor" && restaurantName) {
       try {
         const cuisineArray = cuisine ? cuisine.split(",").map(c => c.trim()) : [];
-        
+
         restaurant = await Restaurant.create({
           name: restaurantName,
           type: restaurantType || "Restaurant",
@@ -101,7 +99,7 @@ const register = async (req, res) => {
             pincode: pincode || "",
           },
         });
-        
+
         console.log(`✅ Restaurant created for vendor ${name}: ${restaurantName}`);
       } catch (restaurantError) {
         console.error("Error creating restaurant:", restaurantError);
@@ -110,8 +108,8 @@ const register = async (req, res) => {
 
     res.status(201).json({
       success: true,
-      message: role === "vendor" && restaurant 
-        ? "User registered successfully! Your restaurant has been created and is pending admin approval." 
+      message: role === "vendor" && restaurant
+        ? "User registered successfully! Your restaurant has been created and is pending admin approval."
         : "User registered successfully",
       user: {
         _id: user._id,
@@ -121,7 +119,7 @@ const register = async (req, res) => {
       },
       ...(restaurant && { restaurant: { _id: restaurant._id, name: restaurant.name } })
     });
-    
+
   } catch (error) {
     console.error("Registration error:", error);
     res.status(500).json({ message: error.message });
@@ -132,33 +130,33 @@ const register = async (req, res) => {
 const login = async (req, res) => {
   try {
     const { email, password } = req.body;
-    
+
     const user = await User.findOne({ email });
     if (!user) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    
+
     // Check for vendor approval
     if (user.role === "vendor") {
       const restaurant = await Restaurant.findOne({ owner: user._id });
       if (restaurant && !restaurant.isApproved) {
-        return res.status(403).json({ 
-          message: "Your restaurant is pending admin approval. You will be notified once approved." 
+        return res.status(403).json({
+          message: "Your restaurant is pending admin approval. You will be notified once approved."
         });
       }
     }
-    
+
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    
+
     const token = jwt.sign(
-      { id: user._id, role: user.role }, 
-      process.env.JWT_SECRET, 
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET,
       { expiresIn: "7d" }
     );
-    
+
     res.json({
       success: true,
       message: "Login successful",

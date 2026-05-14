@@ -2,22 +2,22 @@ const express = require("express");
 const router = express.Router();
 const { protect, authorize } = require("../middleware/authMiddleware");
 const upload = require("../middleware/upload");
-const { 
-  getMyProfile, 
-  updateProfile, 
-  updateAvatar, 
-  updateVehicle, 
-  updateBank, 
-  deleteAccount, 
-  uploadDocuments, 
-  toggleStatus, 
-  getStatus, 
-  updateLocation, 
-  getLocation, 
+const {
+  getMyProfile,
+  updateProfile,
+  updateAvatar,
+  updateVehicle,
+  updateBank,
+  deleteAccount,
+  uploadDocuments,
+  toggleStatus,
+  getStatus,
+  updateLocation,
+  getLocation,
   getIncomingOrders,
   getActiveOrder,
   getOrderById,
-  acceptOrder, 
+  acceptOrder,
   rejectOrder,
   markPickedUp,
   markDelivered,
@@ -37,7 +37,7 @@ const {
   getNotifications,
   saveFcmToken,
   updatePreferences,
-  markAsRead, 
+  markAsRead,
   markAllAsRead,
   getFAQs,
   createTicket,
@@ -54,7 +54,7 @@ const {
 } = require("../controllers/deliveryController");
 
 // All routes require authentication and delivery partner role
-router.use(protect, authorize("delivery"));
+router.use(protect, authorize("delivery", "deliveryPartner", "deliveryagent"));
 
 // ==================== PROFILE ROUTES ====================
 router.get("/me", getMyProfile);

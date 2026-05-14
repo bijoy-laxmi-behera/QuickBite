@@ -6,8 +6,6 @@ import { motion } from "framer-motion";
 import { Eye, EyeOff } from "lucide-react";
 import Logo from "@/assets/logo.png";
 
-const API = import.meta.env.VITE_API_URL;
-
 function Register() {
   const navigate = useNavigate();
 
@@ -19,7 +17,6 @@ function Register() {
     phone: "",
     vehicle: "",
     licensePlate: "",
-    // Vendor-specific fields
     restaurantName: "",
     restaurantType: "Restaurant",
     cuisine: "",
@@ -28,363 +25,163 @@ function Register() {
     pincode: "",
     description: "",
     deliveryTime: "30",
-    minOrder: "199"
+    minOrder: "199",
   });
 
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
+  const [loading, setLoading]           = useState(false);
+  const [error, setError]               = useState("");
+  const [success, setSuccess]           = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   const handleChange = (e) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    setFormData((prev) => ({ ...prev, [e.target.name]: e.target.value }));
   };
 
   const validateForm = () => {
-    if (!formData.name.trim()) return "Full name is required";
-    if (!formData.email.includes("@")) return "Valid email required";
-    if (formData.password.length < 6)
-      return "Password must be at least 6 characters";
-    if (!formData.role) return "Role is required";
-    
-    // Phone for all roles
-    if (!formData.phone.trim()) return "Phone number is required";
-    
-    // Delivery-specific fields
+    if (!formData.name.trim())                     return "Full name is required";
+    if (!formData.email.includes("@"))             return "Valid email required";
+    if (formData.password.length < 6)              return "Password must be at least 6 characters";
+    if (!formData.role)                            return "Role is required";
+    if (!formData.phone.trim())                    return "Phone number is required";
+
     if (formData.role === "delivery") {
-      if (!formData.vehicle.trim()) return "Vehicle information is required for delivery partners";
-      if (!formData.licensePlate.trim()) return "License plate is required for delivery partners";
+      if (!formData.vehicle.trim())                return "Vehicle is required";
+      if (!formData.licensePlate.trim())           return "License plate is required";
     }
-    
-    // Vendor-specific fields
+
     if (formData.role === "vendor") {
-      if (!formData.restaurantName.trim()) return "Restaurant name is required";
-      if (!formData.address.trim()) return "Restaurant address is required";
-      if (!formData.city.trim()) return "City is required";
-      if (!formData.pincode.trim()) return "Pincode is required";
+      if (!formData.restaurantName.trim())         return "Restaurant name is required";
+      if (!formData.address.trim())                return "Address is required";
+      if (!formData.city.trim())                   return "City is required";
+      if (!formData.pincode.trim())                return "Pincode is required";
     }
-    
     return null;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
     const validationError = validateForm();
-    if (validationError) {
-      setError(validationError);
-      return;
-    }
+    if (validationError) { setError(validationError); return; }
 
     try {
       setLoading(true);
       setError("");
+      setSuccess("");
 
-      const res = await axios.post(`${API}/auth/register`, formData);
+      // ✅ Use the configured axios instance — DON'T prepend API URL
+      const res = await axios.post("/auth/register", formData);
 
-      if (res.data.token) {
-        localStorage.setItem("token", res.data.token);
-      }
+      setSuccess(res.data.message || "Account created! Redirecting to login...");
 
-      navigate("/login");
+      // Vendor accounts need admin approval, so just go to login
+      setTimeout(() => navigate("/login"), 1500);
+
     } catch (err) {
-      const message =
-        err.response?.data?.message || "Registration failed. Try again.";
-      setError(message);
+      setError(err.response?.data?.message || "Registration failed. Try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-linear-to-br from-orange-500 via-red-500 to-yellow-400 p-6 relative overflow-hidden">
-      {/* Background blur shapes */}
-      <div className="absolute w-96 h-96 bg-white/20 rounded-full blur-3xl top-10 left-10"></div>
-      <div className="absolute w-96 h-96 bg-yellow-300/20 rounded-full blur-3xl bottom-10 right-10"></div>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-500 via-red-500 to-yellow-400 p-6 relative overflow-hidden">
+
+      {/* Background blur */}
+      <div className="absolute w-96 h-96 bg-white/20 rounded-full blur-3xl top-10 left-10 pointer-events-none" />
+      <div className="absolute w-96 h-96 bg-yellow-300/20 rounded-full blur-3xl bottom-10 right-10 pointer-events-none" />
 
       <motion.div
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.6 }}
-        className="w-full max-w-md backdrop-blur-xl bg-white/20 border border-white/30 shadow-2xl rounded-3xl p-10 overflow-y-auto max-h-[90vh]"
+        className="relative z-10 w-full max-w-md backdrop-blur-xl bg-white/20 border border-white/30 shadow-2xl rounded-3xl p-8 max-h-[90vh] overflow-y-auto"
       >
-        {/* Logo Section */}
-        <div className="flex flex-col items-center mb-10">
-          <div className="w-36 h-36 rounded-full bg-white/30 backdrop-blur-md border border-white/40 shadow-2xl flex items-center justify-center mb-6">
-            <img
-              src={Logo}
-              alt="QuickBite Logo"
-              className="w-24 h-24 object-contain"
-            />
+        {/* Logo */}
+        <div className="flex flex-col items-center mb-6">
+          <div className="w-24 h-24 rounded-full bg-white/30 backdrop-blur-md border border-white/40 shadow-xl flex items-center justify-center mb-4">
+            <img src={Logo} alt="QuickBite Logo" className="w-16 h-16 object-contain" />
           </div>
-
-          <h1 className="text-3xl font-bold text-white">QuickBite</h1>
-
-          <p className="text-white/80 text-sm mt-2">Create your account</p>
+          <h1 className="text-2xl font-bold text-white">Create Account</h1>
+          <p className="text-white/80 text-xs mt-1">Join QuickBite today</p>
         </div>
 
-        {/* Error */}
+        {/* Alerts */}
         {error && (
           <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
             className="mb-4 text-red-100 bg-red-500/30 border border-red-300/30 p-3 rounded-xl text-sm"
           >
-            {error}
+            ⚠️ {error}
+          </motion.div>
+        )}
+        {success && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }}
+            className="mb-4 text-green-100 bg-green-500/30 border border-green-300/30 p-3 rounded-xl text-sm"
+          >
+            ✅ {success}
           </motion.div>
         )}
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Full Name */}
-          <div className="relative">
-            <input
-              type="text"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              placeholder="Full Name"
-              className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-            />
-            <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-              Full Name
-            </label>
-          </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
 
-          {/* Email */}
-          <div className="relative">
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              required
-              placeholder="Email"
-              className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-            />
-            <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-              Email
-            </label>
-          </div>
+          {/* Common Fields */}
+          <FloatingInput name="name"  type="text"  value={formData.name}  onChange={handleChange} label="Full Name" required />
+          <FloatingInput name="email" type="email" value={formData.email} onChange={handleChange} label="Email"     required />
+          <FloatingInput name="phone" type="text"  value={formData.phone} onChange={handleChange} label="Phone Number" required />
 
-          {/* ROLE DROPDOWN */}
-          <div className="relative">
-            <select
-              name="role"
-              value={formData.role}
-              onChange={handleChange}
-              required
-              className="w-full px-4 py-3 bg-white/30 border border-white/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white"
-            >
-              <option value="" disabled className="text-black">
-                Select Role
-              </option>
-              <option value="customer" className="text-black">
-                Customer
-              </option>
-              <option value="vendor" className="text-black">
-                Vendor
-              </option>
-              <option value="delivery" className="text-black">
-                Delivery Partner
-              </option>
-            </select>
-          </div>
+          {/* Role */}
+          <select
+            name="role" value={formData.role} onChange={handleChange} required
+            className="w-full px-4 py-3 bg-white/30 border border-white/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white"
+          >
+            <option value="" disabled className="text-black">Select Role</option>
+            <option value="customer" className="text-black">Customer</option>
+            <option value="vendor"   className="text-black">Vendor</option>
+            <option value="delivery" className="text-black">Delivery Partner</option>
+          </select>
 
-          {/* Phone - Required for all roles */}
-          <div className="relative">
-            <input
-              type="text"
-              name="phone"
-              value={formData.phone}
-              onChange={handleChange}
-              required
-              placeholder="Phone Number"
-              className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-            />
-            <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-              Phone Number
-            </label>
-          </div>
-
-          {/* DELIVERY EXTRA FIELDS - Only shown for delivery role */}
+          {/* DELIVERY FIELDS */}
           {formData.role === "delivery" && (
             <>
-              {/* Vehicle */}
-              <div className="relative">
-                <input
-                  type="text"
-                  name="vehicle"
-                  value={formData.vehicle}
-                  onChange={handleChange}
-                  placeholder="Vehicle (Bike/Car)"
-                  className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-                />
-                <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-                  Vehicle
-                </label>
-              </div>
-
-              {/* License Plate */}
-              <div className="relative">
-                <input
-                  type="text"
-                  name="licensePlate"
-                  value={formData.licensePlate}
-                  onChange={handleChange}
-                  placeholder="License Plate"
-                  className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-                />
-                <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-                  License Plate
-                </label>
-              </div>
+              <FloatingInput name="vehicle"      value={formData.vehicle}      onChange={handleChange} label="Vehicle (Bike/Car)" />
+              <FloatingInput name="licensePlate" value={formData.licensePlate} onChange={handleChange} label="License Plate" />
             </>
           )}
 
-          {/* VENDOR EXTRA FIELDS - Only shown for vendor role */}
+          {/* VENDOR FIELDS */}
           {formData.role === "vendor" && (
             <>
-              {/* Restaurant Name */}
-              <div className="relative">
-                <input
-                  type="text"
-                  name="restaurantName"
-                  value={formData.restaurantName}
-                  onChange={handleChange}
-                  required
-                  placeholder="Restaurant Name"
-                  className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-                />
-                <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-                  Restaurant Name
-                </label>
-              </div>
+              <FloatingInput name="restaurantName" value={formData.restaurantName} onChange={handleChange} label="Restaurant Name" required />
 
-              {/* Restaurant Type */}
-              <div className="relative">
-                <select
-                  name="restaurantType"
-                  value={formData.restaurantType}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 bg-white/30 border border-white/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white"
-                >
-                  <option value="Restaurant" className="text-black">Restaurant</option>
-                  <option value="Cloud Kitchen" className="text-black">Cloud Kitchen</option>
-                </select>
-              </div>
+              <select
+                name="restaurantType" value={formData.restaurantType} onChange={handleChange} required
+                className="w-full px-4 py-3 bg-white/30 border border-white/30 rounded-xl text-white focus:outline-none focus:ring-2 focus:ring-white"
+              >
+                <option value="Restaurant"    className="text-black">🍴 Restaurant</option>
+                <option value="Cloud Kitchen" className="text-black">☁️ Cloud Kitchen</option>
+              </select>
 
-              {/* Cuisine */}
-              <div className="relative">
-                <input
-                  type="text"
-                  name="cuisine"
-                  value={formData.cuisine}
-                  onChange={handleChange}
-                  placeholder="Cuisine (comma separated)"
-                  className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-                />
-                <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-                  Cuisine (e.g., North Indian, Chinese)
-                </label>
-              </div>
+              <FloatingInput name="cuisine"  value={formData.cuisine}  onChange={handleChange} label="Cuisine (comma separated)" />
+              <FloatingInput name="address"  value={formData.address}  onChange={handleChange} label="Street Address" required />
 
-              {/* Address */}
-              <div className="relative">
-                <input
-                  type="text"
-                  name="address"
-                  value={formData.address}
-                  onChange={handleChange}
-                  required
-                  placeholder="Street Address"
-                  className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-                />
-                <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-                  Street Address
-                </label>
-              </div>
-
-              {/* City and Pincode */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="city"
-                    value={formData.city}
-                    onChange={handleChange}
-                    required
-                    placeholder="City"
-                    className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-                  />
-                  <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-                    City
-                  </label>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type="text"
-                    name="pincode"
-                    value={formData.pincode}
-                    onChange={handleChange}
-                    required
-                    placeholder="Pincode"
-                    className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-                  />
-                  <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-                    Pincode
-                  </label>
-                </div>
+                <FloatingInput name="city"    value={formData.city}    onChange={handleChange} label="City" required />
+                <FloatingInput name="pincode" value={formData.pincode} onChange={handleChange} label="Pincode" required />
               </div>
 
-              {/* Description */}
               <div className="relative">
                 <textarea
-                  name="description"
-                  value={formData.description}
-                  onChange={handleChange}
-                  rows="2"
-                  placeholder="Restaurant Description"
+                  name="description" value={formData.description} onChange={handleChange}
+                  rows="2" placeholder="Restaurant Description"
                   className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white resize-none"
                 />
-                <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-                  Description
-                </label>
+                <label className="absolute left-4 top-2 text-xs text-white/70">Description</label>
               </div>
 
-              {/* Delivery Time and Min Order */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <input
-                    type="number"
-                    name="deliveryTime"
-                    value={formData.deliveryTime}
-                    onChange={handleChange}
-                    placeholder="Delivery Time (mins)"
-                    className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-                  />
-                  <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-                    Delivery Time (mins)
-                  </label>
-                </div>
-
-                <div className="relative">
-                  <input
-                    type="number"
-                    name="minOrder"
-                    value={formData.minOrder}
-                    onChange={handleChange}
-                    placeholder="Min Order Amount"
-                    className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
-                  />
-                  <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-                    Min Order (₹)
-                  </label>
-                </div>
+                <FloatingInput type="number" name="deliveryTime" value={formData.deliveryTime} onChange={handleChange} label="Delivery (min)" />
+                <FloatingInput type="number" name="minOrder"     value={formData.minOrder}     onChange={handleChange} label="Min Order (₹)" />
               </div>
             </>
           )}
@@ -393,51 +190,50 @@ function Register() {
           <div className="relative">
             <input
               type={showPassword ? "text" : "password"}
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              required
-              minLength={6}
-              placeholder="Password"
+              name="password" value={formData.password} onChange={handleChange}
+              required minLength={6} placeholder="Password"
               className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
             />
-            <label className="absolute left-4 top-2 text-sm text-white/70 transition-all peer-placeholder-shown:top-4 peer-placeholder-shown:text-base peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-sm">
-              Password
-            </label>
-
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              className="absolute right-4 top-4 text-white/70 hover:text-white"
-            >
+            <label className="absolute left-4 top-2 text-xs text-white/70">Password</label>
+            <button type="button" onClick={() => setShowPassword(!showPassword)}
+              className="absolute right-4 top-4 text-white/70 hover:text-white">
               {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
             </button>
           </div>
 
           {/* Submit */}
           <motion.button
-            whileHover={{ scale: 1.02 }}
-            whileTap={{ scale: 0.97 }}
-            type="submit"
-            disabled={loading}
-            className={`w-full py-3 rounded-xl font-semibold text-white transition
-              ${
-                loading
-                  ? "bg-gray-400 cursor-not-allowed"
-                  : "bg-linear-to-r from-orange-500 to-red-600 shadow-lg hover:shadow-xl"
-              }`}
+            whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.97 }}
+            type="submit" disabled={loading}
+            className={`w-full py-3 rounded-xl font-semibold text-white transition ${
+              loading ? "bg-gray-400 cursor-not-allowed"
+                     : "bg-gradient-to-r from-orange-500 to-red-600 shadow-lg hover:shadow-xl"
+            }`}
           >
-            {loading ? "Registering..." : "Register"}
+            {loading ? "Creating account..." : "Register"}
           </motion.button>
         </form>
 
-        <p className="text-sm text-white/80 mt-8 text-center">
+        <p className="text-sm text-white/80 mt-6 text-center">
           Already have an account?{" "}
-          <Link to="/login" className="font-medium text-white hover:underline">
-            Login
-          </Link>
+          <Link to="/login" className="font-semibold text-white hover:underline">Login</Link>
         </p>
       </motion.div>
+    </div>
+  );
+}
+
+// ─── Reusable Floating Input ─────────────────────────────
+function FloatingInput({ name, type = "text", value, onChange, label, required }) {
+  return (
+    <div className="relative">
+      <input
+        type={type} name={name} value={value} onChange={onChange} required={required} placeholder={label}
+        className="peer w-full px-4 pt-5 pb-2 bg-white/30 border border-white/30 rounded-xl text-white placeholder-transparent focus:outline-none focus:ring-2 focus:ring-white"
+      />
+      <label className="absolute left-4 top-2 text-xs text-white/70 transition-all peer-placeholder-shown:top-3.5 peer-placeholder-shown:text-sm peer-placeholder-shown:text-white/60 peer-focus:top-2 peer-focus:text-xs">
+        {label}
+      </label>
     </div>
   );
 }

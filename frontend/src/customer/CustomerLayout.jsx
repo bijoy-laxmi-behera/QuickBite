@@ -50,7 +50,6 @@ const CustomerLayout = () => {
         setCartLoading(false);
         return;
       }
-
       try {
         const response = await API.get("/customer/me/cart");
         if (response.data.success) {
@@ -74,7 +73,6 @@ const CustomerLayout = () => {
         setCartLoading(false);
       }
     };
-
     fetchCart();
   }, []);
 
@@ -86,7 +84,6 @@ const CustomerLayout = () => {
         setFavouritesLoading(false);
         return;
       }
-
       try {
         const response = await API.get("/customer/me/favourites");
         if (response.data.success) {
@@ -108,7 +105,6 @@ const CustomerLayout = () => {
         setFavouritesLoading(false);
       }
     };
-
     fetchFavourites();
   }, []);
 
@@ -118,7 +114,6 @@ const CustomerLayout = () => {
       const refreshCart = async () => {
         const token = localStorage.getItem("token");
         if (!token) return;
-
         try {
           const response = await API.get("/customer/me/cart");
           if (response.data.success) {
@@ -142,37 +137,35 @@ const CustomerLayout = () => {
       };
       refreshCart();
     };
-
     window.addEventListener('cartUpdated', handleCartUpdate);
     return () => window.removeEventListener('cartUpdated', handleCartUpdate);
   }, []);
 
-  // Navigation handler
+  // ─── Navigation handler ─────────────────────────────────────────────────────
   const setPage = (page) => {
     if (!page) return;
-    
-    // Don't navigate if already on that page
     if (activePage === page) return;
-    
+
     const pageMap = {
-      home: "/customer/home",
-      cart: "/customer/cart",
-      checkout: "/customer/checkout",
-      favourites: "/customer/favourites",
-      orders: "/customer/orders",
-      success: "/customer/order-success",
-      tracking: "/customer/order-tracking",
-      payments: "/customer/payments",
-      profile: "/customer/profile",      // Profile page
-      settings: "/customer/profile",     // Settings also goes to Profile page
-      reviews: "/customer/reviews",
-      addresses: "/customer/addresses",
-      notifications: "/customer/notifications",
+      home:                 "/customer/home",
+      cart:                 "/customer/cart",
+      checkout:             "/customer/checkout",
+      favourites:           "/customer/favourites",
+      orders:               "/customer/orders",
+      success:              "/customer/order-success",
+      // ── PATCH: tracking now uses the stored orderId so the URL has the param ──
+      tracking:             `/customer/order-tracking/${localStorage.getItem("trackingOrderId") || ""}`,
+      payments:             "/customer/payments",
+      profile:              "/customer/profile",
+      settings:             "/customer/profile",
+      reviews:              "/customer/reviews",
+      addresses:            "/customer/addresses",
+      notifications:        "/customer/notifications",
       subscriptionCheckout: "/customer/subscription-checkout",
-      subscriptionSuccess: "/customer/subscription-success",
-      categories: "/customer/categories"
+      subscriptionSuccess:  "/customer/subscription-success",
+      categories:           "/customer/categories",
     };
-    
+
     if (pageMap[page]) {
       navigate(pageMap[page]);
     } else if (page === "restaurant" && selectedRestaurant) {
@@ -193,7 +186,7 @@ const CustomerLayout = () => {
         />
       )}
 
-      {/* ── Sidebar (gets activePage for highlighting) ── */}
+      {/* ── Sidebar ── */}
       <Sidebar
         sidebarOpen={sidebarOpen}
         setSidebarOpen={setSidebarOpen}
@@ -205,10 +198,7 @@ const CustomerLayout = () => {
 
         {/* Hamburger topbar — mobile only */}
         <div className="md:hidden flex items-center gap-3 px-4 py-3 bg-white shadow-sm shrink-0">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="text-2xl text-gray-600"
-          >
+          <button onClick={() => setSidebarOpen(true)} className="text-2xl text-gray-600">
             ☰
           </button>
           <span className="font-extrabold text-orange-500 text-lg tracking-tight">
@@ -220,121 +210,45 @@ const CustomerLayout = () => {
         <main className="flex-1 overflow-y-auto">
           <Routes>
             <Route path="/" element={<Navigate to="/customer/home" replace />} />
-            
-            <Route 
-              path="home" 
-              element={
-                <Home 
-                  cart={cart}
-                  setCart={setCart}
-                  setSelectedRestaurant={setSelectedRestaurant}
-                  setFavourites={setFavourites}
-                  setPage={setPage}
-                />
-              } 
-            />
-            
-            <Route 
-              path="cart" 
-              element={
-                <Cart 
-                  cart={cart}
-                  setCart={setCart}
-                  setPage={setPage}
-                />
-              } 
-            />
-            
-            <Route 
-              path="checkout" 
-              element={
-                <Checkout 
-                  cart={cart}
-                  setCart={setCart}
-                  setPage={setPage}
-                />
-              } 
-            />
-            
-            <Route 
-              path="favourites" 
-              element={
-                <Favourites 
-                  favourites={favourites}
-                  setFavourites={setFavourites}
-                  setPage={setPage}
-                  setSelectedRestaurant={setSelectedRestaurant}
-                />
-              } 
-            />
-            
-            <Route 
-              path="orders" 
-              element={<Orders setPage={setPage} />} 
-            />
-            
-            <Route 
-              path="order-success" 
-              element={<OrderSuccess setPage={setPage} />} 
-            />
-            
-            <Route 
-              path="order-tracking/:orderId" 
-              element={<OrderTracking setPage={setPage} />} 
-            />
-            
-            <Route 
-              path="payments" 
-              element={<Payments />} 
-            />
-            
-            <Route 
-              path="profile" 
-              element={<Profile setPage={setPage} />} 
-            />
-            
-            <Route 
-              path="restaurant/:restaurantId" 
-              element={
-                <Restaurant 
-                  restaurant={selectedRestaurant}
-                  setCart={setCart}
-                  cart={cart}
-                  setPage={setPage}
-                  setFavourites={setFavourites}
-                />
-              } 
-            />
-            
-            <Route 
-              path="reviews" 
-              element={<Reviews />} 
-            />
-            
-            <Route 
-              path="addresses" 
-              element={<Addresses />} 
-            />
-            
-            <Route 
-              path="notifications" 
-              element={<Notifications />} 
-            />
-            
-            <Route 
-              path="subscription-checkout" 
-              element={<SubscriptionCheckout setPage={setPage} />} 
-            />
-            
-            <Route 
-              path="categories" 
-              element={<Categories />} 
-            />
-            
-            <Route 
-              path="subscription-success" 
-              element={<SubscriptionSuccess setPage={setPage} />} 
-            />
+
+            <Route path="home" element={
+              <Home cart={cart} setCart={setCart} setSelectedRestaurant={setSelectedRestaurant} setFavourites={setFavourites} setPage={setPage} />
+            } />
+
+            <Route path="cart" element={
+              <Cart cart={cart} setCart={setCart} setPage={setPage} />
+            } />
+
+            <Route path="checkout" element={
+              <Checkout cart={cart} setCart={setCart} setPage={setPage} />
+            } />
+
+            <Route path="favourites" element={
+              <Favourites favourites={favourites} setFavourites={setFavourites} setPage={setPage} setSelectedRestaurant={setSelectedRestaurant} />
+            } />
+
+            <Route path="orders" element={<Orders setPage={setPage} />} />
+
+            <Route path="order-success" element={<OrderSuccess setPage={setPage} />} />
+
+            {/* ── PATCH: OrderTracking uses useParams() internally — no setPage needed ── */}
+            <Route path="order-tracking/:orderId" element={<OrderTracking />} />
+
+            <Route path="payments" element={<Payments />} />
+
+            <Route path="profile" element={<Profile setPage={setPage} />} />
+
+            <Route path="restaurant/:restaurantId" element={
+              <Restaurant restaurant={selectedRestaurant} setCart={setCart} cart={cart} setPage={setPage} setFavourites={setFavourites} />
+            } />
+
+            <Route path="reviews"       element={<Reviews />} />
+            <Route path="addresses"     element={<Addresses />} />
+            <Route path="notifications" element={<Notifications />} />
+
+            <Route path="subscription-checkout" element={<SubscriptionCheckout setPage={setPage} />} />
+            <Route path="categories"            element={<Categories />} />
+            <Route path="subscription-success"  element={<SubscriptionSuccess setPage={setPage} />} />
           </Routes>
         </main>
       </div>
