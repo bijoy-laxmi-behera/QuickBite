@@ -25,22 +25,15 @@ const app = express();
 // ── DB ────────────────────────────────────────────────────────────────────────
 connectDB();
 
-// ── Allowed Origins ───────────────────────────────────────────────────────────
-const allowedOrigins = [
-  "https://quick-bite-2026.vercel.app",
-  "http://localhost:5173",
-];
-
 // ── Middleware ────────────────────────────────────────────────────────────────
+// CORS MUST be first
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
-      callback(new Error(`CORS blocked: ${origin}`));
-    },
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   })
 );
+app.options("*", cors({ origin: allowedOrigins, credentials: true, methods: ["GET","POST","PUT","DELETE","PATCH","OPTIONS"], allowedHeaders: ["Content-Type","Authorization"] }));
 app.use(express.json());
 app.use(cookieParser());
 
@@ -63,7 +56,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: allowedOrigins,
+    origin: process.env.CLIENT_URL || "http://localhost:5173",
     credentials: true,
   },
 });
@@ -98,6 +91,7 @@ io.on("connection", (socket) => {
   });
 
   // ── Order tracking room (used by OrderTracking.jsx) ──────────────────────────
+  // Frontend emits: joinOrderRoom / leaveOrderRoom
   socket.on("joinOrderRoom", (orderId) => {
     if (!orderId) return;
     socket.join(`order-${orderId}`);
@@ -113,7 +107,7 @@ io.on("connection", (socket) => {
     console.log(`📍 Socket ${socket.id} left order room: ${orderId}`);
   });
 
-  // Legacy event names (kept for backward compatibility)
+  // Legacy event names (kept for backward compatibility with older code)
   socket.on("join-order-tracking", ({ orderId, userId }) => {
     if (!orderId) return;
     socket.join(`order-${orderId}`);
@@ -140,6 +134,7 @@ io.on("connection", (socket) => {
       });
     }
 
+    // Broadcast to everyone tracking this order
     io.to(`order-${orderId}`).emit("delivery-location-update", {
       orderId,
       location: { lat: location.lat, lng: location.lng, accuracy: location.accuracy || null },
@@ -159,14 +154,15 @@ io.on("connection", (socket) => {
     });
   });
 
-  // ── Order status update ────────────────────────────────────────────────────
+  // ── Order status update (emitted by controllers via req.app.get("io")) ────────
+  // Frontend listens to: "orderStatusUpdate"
   socket.on("orderUpdate", ({ userId, data }) => {
     if (!userId) return;
     io.to(userId.toString()).emit("orderStatusUpdate", data);
     if (data.orderId) io.to(`order-${data.orderId}`).emit("orderStatusUpdate", data);
   });
 
-  // ── Live location stream ───────────────────────────────────────────────────
+  // ── Live location stream (request/stop) ───────────────────────────────────────
   socket.on("request-live-location", ({ orderId, customerId }) => {
     if (!orderId || !customerId) return;
     socket.join(`live-location-${orderId}`);
@@ -192,19 +188,19 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ── Notifications ─────────────────────────────────────────────────────────
+  // ── Notifications ─────────────────────────────────────────────────────────────
   socket.on("sendNotification", ({ userId, notification }) => {
     if (!userId) return;
     io.to(userId.toString()).emit("newNotification", notification);
   });
 
-  // ── Typing indicator ──────────────────────────────────────────────────────
+  // ── Typing indicator (support chat) ──────────────────────────────────────────
   socket.on("typing", ({ userId, orderId, isTyping }) => {
     if (!orderId) return;
     socket.to(`order-${orderId}`).emit("user-typing", { userId, isTyping });
   });
 
-  // ── Disconnect cleanup ────────────────────────────────────────────────────
+  // ── Disconnect cleanup ────────────────────────────────────────────────────────
   socket.on("disconnect", () => {
     console.log("❌ Disconnected:", socket.id);
     orderTrackingRooms.delete(socket.id);
@@ -219,19 +215,36 @@ io.on("connection", (socket) => {
   });
 });
 
-// ── Global helpers ────────────────────────────────────────────────────────────
+// ── Global helpers (call these from any controller) ───────────────────────────
+
+/**
+ * Broadcast a delivery GPS location update to everyone tracking the order.
+ * Usage in controller: global.broadcastDeliveryLocation(orderId, { lat, lng }, "on_the_way")
+ */
 global.broadcastDeliveryLocation = (orderId, location, status) => {
   io.to(`order-${orderId}`).emit("delivery-location-update", {
     orderId, location, status, timestamp: new Date(),
   });
 };
 
+/**
+ * Broadcast an order status change to:
+ *   - the order's tracking room  → picked up by OrderTracking.jsx
+ *   - the customer's personal room → picked up by Orders.jsx
+ *
+ * Usage in controller:
+ *   global.broadcastOrderStatus(order._id, "preparing", order.customer)
+ */
 global.broadcastOrderStatus = (orderId, status, userId, extra = {}) => {
   const payload = { orderId: orderId.toString(), status, timestamp: new Date(), ...extra };
   io.to(`order-${orderId}`).emit("orderStatusUpdate", payload);
   if (userId) io.to(userId.toString()).emit("orderStatusUpdate", payload);
 };
 
+/**
+ * Broadcast a payment confirmation (used by razorpayController after webhook/verify).
+ * Usage: global.broadcastPaymentConfirmed(orderId, userId)
+ */
 global.broadcastPaymentConfirmed = (orderId, userId) => {
   const payload = { orderId: orderId.toString(), status: "paid", timestamp: new Date() };
   io.to(`order-${orderId}`).emit("paymentConfirmed", payload);
