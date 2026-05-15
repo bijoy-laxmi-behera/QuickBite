@@ -8,15 +8,15 @@ import Logo from "@/assets/logo.png";
 function Login() {
   const navigate = useNavigate();
 
-  const [formData, setFormData]       = useState({ email: "", password: "" });
-  const [loading, setLoading]         = useState(false);
-  const [error, setError]             = useState("");
+  const [formData, setFormData] = useState({ email: "", password: "" });
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
 
   // 🔥 Auto redirect if already logged in
   useEffect(() => {
     const token = localStorage.getItem("token");
-    const user  = JSON.parse(localStorage.getItem("user") || "null");
+    const user = JSON.parse(localStorage.getItem("user") || "null");
     if (token && user?.role) {
       redirectByRole(user.role);
     }
@@ -24,11 +24,18 @@ function Login() {
 
   const redirectByRole = (role) => {
     switch (role) {
-      case "admin":           navigate("/admin/dashboard");    break;
-      case "vendor":          navigate("/vendor/dashboard");   break;
+      case "admin":
+        navigate("/admin/dashboard");
+        break;
+      case "vendor":
+        navigate("/vendor/dashboard");
+        break;
       case "delivery":
-      case "deliveryPartner": navigate("/delivery/dashboard"); break;
-      default:                navigate("/customer/home");
+      case "deliveryPartner":
+        navigate("/delivery/dashboard");
+        break;
+      default:
+        navigate("/customer/home");
     }
   };
 
@@ -52,7 +59,7 @@ function Login() {
 
       // Backend may return either `token` or `accessToken`
       const token = res.data.token || res.data.accessToken;
-      const user  = res.data.user || res.data.data?.user;
+      const user = res.data.user || res.data.data?.user;
 
       if (!token || !user) {
         throw new Error("Invalid login response from server");
@@ -60,12 +67,11 @@ function Login() {
 
       // ✅ Save everything needed
       localStorage.setItem("token", token);
-      localStorage.setItem("user",  JSON.stringify(user));
-      localStorage.setItem("role",  user.role);
+      localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("role", user.role);
 
       // ✅ Redirect by role
       redirectByRole(user.role);
-
     } catch (err) {
       console.error("LOGIN ERROR:", err);
       setError(err.response?.data?.message || err.message || "Login failed");
@@ -76,7 +82,6 @@ function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-500 via-red-500 to-yellow-400 p-6 relative overflow-hidden">
-
       {/* Background glow */}
       <div className="absolute w-96 h-96 bg-white/20 rounded-full blur-3xl top-10 left-10 pointer-events-none" />
       <div className="absolute w-96 h-96 bg-yellow-300/20 rounded-full blur-3xl bottom-10 right-10 pointer-events-none" />
@@ -87,7 +92,6 @@ function Login() {
         transition={{ duration: 0.6 }}
         className="relative z-10 w-full max-w-md backdrop-blur-xl bg-white/20 border border-white/30 shadow-2xl rounded-3xl p-10"
       >
-
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
           <img src={Logo} alt="QuickBite Logo" className="w-16 mb-4" />
@@ -104,7 +108,6 @@ function Login() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-6">
-
           <input
             type="email"
             name="email"
@@ -135,7 +138,10 @@ function Login() {
           </div>
 
           <div className="text-right">
-            <Link to="/forgot-password" className="text-sm text-white hover:underline">
+            <Link
+              to="/forgot-password"
+              className="text-sm text-white hover:underline"
+            >
               Forgot Password?
             </Link>
           </div>
@@ -144,7 +150,9 @@ function Login() {
             type="submit"
             disabled={loading}
             className={`w-full py-3 rounded-xl font-semibold text-white transition ${
-              loading ? "bg-gray-400 cursor-not-allowed" : "bg-gradient-to-r from-orange-500 to-red-600 hover:scale-[1.02]"
+              loading
+                ? "bg-gray-400 cursor-not-allowed"
+                : "bg-gradient-to-r from-orange-500 to-red-600 hover:scale-[1.02]"
             }`}
           >
             {loading ? "Logging in..." : "Login"}
