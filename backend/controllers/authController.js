@@ -238,7 +238,7 @@ const resetPassword = async (req, res) => {
     if (!user) {
       return res.status(400).json({ message: "Invalid or expired OTP" });
     }
-    user.password = newPassword;
+    user.password = await bcrypt.hash(newPassword, 10);
     user.resetOTP = undefined;
     user.otpExpire = undefined;
     await user.save();
@@ -257,7 +257,7 @@ const changePassword = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: "Old password incorrect" });
     }
-    user.password = newPassword;
+    user.password = await bcrypt.hash(newPassword, 10);
     await user.save();
     res.json({ message: "Password changed successfully" });
   } catch (error) {

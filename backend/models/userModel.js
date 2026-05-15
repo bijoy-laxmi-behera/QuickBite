@@ -35,8 +35,8 @@ const userSchema = new mongoose.Schema(
       default: "customer",
     },
 
-    resetOTP: String,
-    otpExpire: Date,
+    resetOTP: { type: String },
+    otpExpire: { type: Date },
 
     // Vendor fields
     restaurantName: String,
@@ -97,12 +97,12 @@ const userSchema = new mongoose.Schema(
           quantity: {
             type: Number,
             required: true,
-    min: 1,
+            min: 1,
             default: 1,
           },
           customization: {
             type: mongoose.Schema.Types.Mixed, // Changed from String to Mixed to accept objects
-    default: {}
+            default: {}
           }
         },
       ],
@@ -187,8 +187,8 @@ const userSchema = new mongoose.Schema(
       promotions: { type: Boolean, default: true },
     },
     price: {
-    type: Number
-  }
+      type: Number
+    }
   },
   { timestamps: true }
 );
