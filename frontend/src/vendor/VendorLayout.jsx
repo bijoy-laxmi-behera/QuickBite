@@ -21,8 +21,7 @@ import Settings         from "./pages/Settings";
 import Inventory        from "./pages/Inventory";
 
 export default function VendorLayout() {
-  const location = useNavigate ? useNavigate() : null;
-  const loc = useLocation();
+  const loc      = useLocation();
   const navigate = useNavigate();
 
   const [sidebarOpen, setSidebarOpen]   = useState(false);
@@ -96,8 +95,7 @@ export default function VendorLayout() {
               <Route path="/"              element={<Navigate to="/vendor/dashboard" replace />} />
               <Route path="dashboard"      element={<Dashboard isCloudKitchen={isCloudKitchen} restaurant={restaurant} />} />
               <Route path="orders"         element={<Orders isCloudKitchen={isCloudKitchen} />} />
-              <Route path="menu"           element={<Menu />} />
-              <Route path="inventory"      element={<Inventory />} />
+              <Route path="menu"           element={<Menu isCloudKitchen={isCloudKitchen} />} />
               <Route path="earnings"       element={<Earnings />} />
               <Route path="reviews"        element={<Reviews />} />
               <Route path="profile"        element={<Profile restaurant={restaurant} setRestaurant={setRestaurant} isCloudKitchen={isCloudKitchen} />} />
