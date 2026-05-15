@@ -44,7 +44,6 @@ const corsOptions = {
 };
 
 app.use(cors(corsOptions));
-
 app.use(express.json());
 app.use(cookieParser());
 
@@ -67,7 +66,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:5173",
+    origin: ["https://quick-bite-2026.vercel.app","http://localhost:5173"],
     credentials: true,
   },
 });
