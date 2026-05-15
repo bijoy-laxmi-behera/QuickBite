@@ -33,7 +33,7 @@ const getRestaurants = async (req, res) => {
     const { cuisine, limit = 20, page = 1 } = req.query;
     
     // IMPORTANT: Only show approved restaurants to customers
-    let filter = { isApproved: true };
+    let filter = { isApproved: true, type: { $ne: "Cloud Kitchen" } };
     
     // Add cuisine filter if provided
     if (cuisine) {
@@ -67,7 +67,8 @@ const searchRestaurants = async (req, res) => {
     
     // Only search approved restaurants
     const data = await Restaurant.find({
-      isApproved: true,
+  isApproved: true,
+  type: { $ne: "Cloud Kitchen" },
       $or: [
         { name: { $regex: q, $options: "i" } },
         { cuisine: { $regex: q, $options: "i" } },
@@ -264,10 +265,7 @@ const getMenuItem = async (req, res) => {
 
 const getCategories = async (req, res) => {
   try {
-    // Only show global categories (created by admin) and active
-    const categories = await Category.find({ vendor: null, isActive: true })
-      .sort({ order: 1, name: 1 });
-    
+    const categories = await Category.find();
     // Get item count for each category (only from approved restaurants)
     const categoriesWithCount = await Promise.all(
       categories.map(async (cat) => {

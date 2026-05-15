@@ -862,13 +862,11 @@ const createCategory = async (req, res) => {
   try {
     const cat = await Category.create({
       ...req.body,
-      vendor: null,
+      vendor: req.user.id,
       slug: req.body.name?.toLowerCase().replace(/\s+/g, "-")
     });
     res.json({ success: true, data: cat });
-  } catch (e) { 
-    res.status(500).json({ success: false, message: e.message }); 
-  }
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
 const updateCategory = async (req, res) => {
