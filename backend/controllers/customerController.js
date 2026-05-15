@@ -264,7 +264,10 @@ const getMenuItem = async (req, res) => {
 
 const getCategories = async (req, res) => {
   try {
-    const categories = await Category.find();
+    // Only show global categories (created by admin) and active
+    const categories = await Category.find({ vendor: null, isActive: true })
+      .sort({ order: 1, name: 1 });
+    
     // Get item count for each category (only from approved restaurants)
     const categoriesWithCount = await Promise.all(
       categories.map(async (cat) => {

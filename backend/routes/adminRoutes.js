@@ -54,6 +54,11 @@ const {
   getPeakHours,
   getSettings,
   updateSettings,
+  getCategories,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  toggleCategory,
 } = require("../controllers/adminController");
 
 // ============ MIDDLEWARE ============
@@ -131,5 +136,12 @@ router.get("/analytics/peak-hours", getPeakHours);
 // ============ SETTINGS ROUTES ============
 router.get("/settings", getSettings);
 router.put("/settings", updateSettings);
+
+// ============ CATEGORY ROUTES ============
+router.get("/categories", getCategories);
+router.post("/categories", createCategory);
+router.put("/categories/:id", updateCategory);
+router.delete("/categories/:id", deleteCategory);
+router.patch("/categories/:id/toggle", toggleCategory);
 
 module.exports = router;

@@ -850,6 +850,51 @@ const updateSettings = async (req, res) => {
   }
 };
 
+// ============ CATEGORY CONTROLLERS ============
+const getCategories = async (req, res) => {
+  try {
+    const cats = await Category.find().sort({ order: 1, createdAt: -1 });
+    res.json({ success: true, data: cats });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+const createCategory = async (req, res) => {
+  try {
+    const cat = await Category.create({
+      ...req.body,
+      vendor: null,
+      slug: req.body.name?.toLowerCase().replace(/\s+/g, "-")
+    });
+    res.json({ success: true, data: cat });
+  } catch (e) { 
+    res.status(500).json({ success: false, message: e.message }); 
+  }
+};
+
+const updateCategory = async (req, res) => {
+  try {
+    const cat = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
+    res.json({ success: true, data: cat });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+const deleteCategory = async (req, res) => {
+  try {
+    await Category.findByIdAndDelete(req.params.id);
+    res.json({ success: true, message: "Deleted" });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
+const toggleCategory = async (req, res) => {
+  try {
+    const cat = await Category.findById(req.params.id);
+    if (!cat) return res.status(404).json({ success: false, message: "Not found" });
+    cat.isActive = !cat.isActive;
+    await cat.save();
+    res.json({ success: true, data: cat });
+  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+};
+
 module.exports = {
   // User
   getAllUsers,
@@ -911,4 +956,11 @@ module.exports = {
   // Settings
   getSettings,
   updateSettings,
+
+  // Categories
+getCategories,
+createCategory,
+updateCategory,
+deleteCategory,
+toggleCategory,
 };

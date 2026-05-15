@@ -16,6 +16,7 @@ import Coupons            from "./pages/Coupons";
 import Payments           from "./pages/Payments";
 import Reviews            from "./pages/FeedbackReviews";
 import Settings           from "./pages/Settings";
+import Categories         from "./pages/Categories";   // ← NEW
 
 export default function AdminLayout() {
   const [page, setPage]           = useState("dashboard");
@@ -31,17 +32,18 @@ export default function AdminLayout() {
 
   const renderPage = () => {
     switch (page) {
-      case "dashboard": return <Dashboard setPage={setPage} />;
-      case "users":     return <UserManagement />;
-      case "vendors":   return <VendorManagement />;
-      case "orders":    return <OrderManagement />;
-      case "delivery":  return <DeliveryManagement />;
-      case "analytics": return <Analytics />;
-      case "coupons":   return <Coupons />;
-      case "payments":  return <Payments />;
-      case "reviews":   return <Reviews />;
-      case "settings":  return <Settings />;
-      default:          return <Dashboard setPage={setPage} />;
+      case "dashboard":  return <Dashboard setPage={setPage} />;
+      case "users":      return <UserManagement />;
+      case "vendors":    return <VendorManagement />;
+      case "orders":     return <OrderManagement />;
+      case "delivery":   return <DeliveryManagement />;
+      case "analytics":  return <Analytics />;
+      case "coupons":    return <Coupons />;
+      case "payments":   return <Payments />;
+      case "reviews":    return <Reviews />;
+      case "settings":   return <Settings />;
+      case "categories": return <Categories />;          // ← NEW
+      default:           return <Dashboard setPage={setPage} />;
     }
   };
 

@@ -2,20 +2,21 @@ import { useNavigate } from "react-router-dom";
 import {
   LayoutDashboard, Users, Store, ShoppingBag,
   Truck, BarChart2, Settings, LogOut, ChevronLeft,
-  ChevronRight, Tag, CreditCard, Star, User
+  ChevronRight, Tag, CreditCard, Star, LayoutGrid
 } from "lucide-react";
 
 const navItems = [
-  { id: "dashboard",    label: "Dashboard",       icon: LayoutDashboard },
-  { id: "users",        label: "Users",            icon: Users },
-  { id: "vendors",      label: "Vendors",          icon: Store },
-  { id: "orders",       label: "Orders",           icon: ShoppingBag },
-  { id: "delivery",     label: "Delivery",         icon: Truck },
-  { id: "analytics",    label: "Analytics",        icon: BarChart2 },
-  { id: "coupons",      label: "Coupons",          icon: Tag },
-  { id: "payments",     label: "Payments",         icon: CreditCard },
-  { id: "reviews",      label: "Reviews",          icon: Star },
-  { id: "settings",     label: "Settings",         icon: Settings },
+  { id: "dashboard",   label: "Dashboard",   icon: LayoutDashboard },
+  { id: "users",       label: "Users",        icon: Users           },
+  { id: "vendors",     label: "Vendors",      icon: Store           },
+  { id: "categories",  label: "Categories",   icon: LayoutGrid      }, // ← NEW
+  { id: "orders",      label: "Orders",       icon: ShoppingBag     },
+  { id: "delivery",    label: "Delivery",     icon: Truck           },
+  { id: "analytics",   label: "Analytics",    icon: BarChart2       },
+  { id: "coupons",     label: "Coupons",      icon: Tag             },
+  { id: "payments",    label: "Payments",     icon: CreditCard      },
+  { id: "reviews",     label: "Reviews",      icon: Star            },
+  { id: "settings",    label: "Settings",     icon: Settings        },
 ];
 
 export default function Sidebar({ page, setPage, collapsed, setCollapsed }) {
@@ -41,8 +42,10 @@ export default function Sidebar({ page, setPage, collapsed, setCollapsed }) {
             <span className="text-lg font-black text-white tracking-tight">Quick<span className="text-orange-400">Bite</span></span>
           </div>
         )}
-        <button onClick={() => setCollapsed(!collapsed)}
-          className="text-gray-400 hover:text-orange-400 transition ml-auto p-1 rounded-lg hover:bg-gray-800">
+        <button
+          onClick={() => setCollapsed(!collapsed)}
+          className="text-gray-400 hover:text-orange-400 transition ml-auto p-1 rounded-lg hover:bg-gray-800"
+        >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
       </div>
@@ -57,25 +60,28 @@ export default function Sidebar({ page, setPage, collapsed, setCollapsed }) {
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
         {navItems.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setPage(id)}
+          <button
+            key={id}
+            onClick={() => setPage(id)}
             title={collapsed ? label : ""}
             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
               page === id
                 ? "bg-orange-500 text-white shadow-lg shadow-orange-500/20"
                 : "text-gray-400 hover:bg-gray-800 hover:text-white"
-            }`}>
+            }`}
+          >
             <Icon size={17} className="flex-shrink-0" />
             {!collapsed && <span>{label}</span>}
-            {!collapsed && page === id && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white" />}
+            {!collapsed && page === id && (
+              <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white" />
+            )}
           </button>
         ))}
       </nav>
 
       {/* User + Logout */}
       <div className="p-3 border-t border-gray-800 space-y-2">
-        
-        {/* Profile Button - Opens Settings */}
-        <button 
+        <button
           onClick={() => setPage("settings")}
           className="w-full flex items-center gap-2.5 hover:bg-gray-800 rounded-xl p-2 transition"
           title={collapsed ? "Profile" : ""}
@@ -91,10 +97,11 @@ export default function Sidebar({ page, setPage, collapsed, setCollapsed }) {
           )}
         </button>
 
-        {/* Logout Button */}
-        <button onClick={handleLogout}
+        <button
+          onClick={handleLogout}
           title={collapsed ? "Logout" : ""}
-          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition ${collapsed ? "justify-center" : ""}`}>
+          className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-sm font-medium text-red-400 hover:bg-red-500/10 transition ${collapsed ? "justify-center" : ""}`}
+        >
           <LogOut size={15} className="flex-shrink-0" />
           {!collapsed && <span>Logout</span>}
         </button>
