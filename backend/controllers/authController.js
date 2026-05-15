@@ -227,23 +227,39 @@ const forgotPassword = async (req, res) => {
 const resetPassword = async (req, res) => {
   try {
     const { email, otp, newPassword, confirmPassword } = req.body;
+
+    if (!email || !otp || !newPassword) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
     if (newPassword !== confirmPassword) {
       return res.status(400).json({ message: "Passwords do not match" });
     }
-    const user = await User.findOne({
-      email: email.toLowerCase(),
-      resetOTP: otp,
-      otpExpire: { $gt: Date.now() }
-    });
+
+    const user = await User.findOne({ email: email.toLowerCase().trim() });
     if (!user) {
-      return res.status(400).json({ message: "Invalid or expired OTP" });
+      return res.status(400).json({ message: "User not found" });
     }
-    user.password = await bcrypt.hash(newPassword, 10);
-    user.resetOTP = undefined;
+
+    console.log("DB resetOTP:", JSON.stringify(user.resetOTP));
+    console.log("Input OTP: ", JSON.stringify(otp.trim()));
+    console.log("Match:", user.resetOTP === otp.trim());
+    console.log("Expire:", user.otpExpire, "Now:", Date.now());
+
+    if (!user.resetOTP || user.resetOTP !== otp.trim()) {
+      return res.status(400).json({ message: "Invalid OTP" });
+    }
+    if (user.otpExpire < Date.now()) {
+      return res.status(400).json({ message: "OTP expired" });
+    }
+
+    user.password  = await bcrypt.hash(newPassword, 10);
+    user.resetOTP  = undefined;
     user.otpExpire = undefined;
     await user.save();
+
     res.json({ message: "Password reset successful" });
   } catch (error) {
+    console.error("resetPassword error:", error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -257,7 +273,7 @@ const changePassword = async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ message: "Old password incorrect" });
     }
-    user.password = await bcrypt.hash(newPassword, 10);
+    user.password = newPassword;
     await user.save();
     res.json({ message: "Password changed successfully" });
   } catch (error) {
