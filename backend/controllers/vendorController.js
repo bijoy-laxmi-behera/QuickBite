@@ -6,6 +6,7 @@ const Category=require("../models/Category");
 const Inventory=require("../models/Inventory");
 const Payout=require("../models/payoutModel");
 const User=require("../models/userModel");
+const Restaurant=require("../models/Restaurant");
 const Notification=require("../models/Notification");
 const cloudinary=require("../config/cloudinary");
 // OVERVIEW
@@ -1427,10 +1428,14 @@ const getProfile = async (req, res) => {
     const vendor = await User.findById(req.user._id).select("-password");
 
     if (!vendor) {
-      return res.status(404).json({
-        message: "Vendor not found"
-      });
+      return res.status(404).json({ message: "Vendor not found" });
     }
+
+    // Fetch the Restaurant document to get the type field
+    const restaurant = await Restaurant.findOne({ owner: req.user._id }).select(
+      "name type cuisine address location image logo description deliveryTime minOrder isOpen isApproved rating"
+    );
+
     const autoOpenStatus = isRestaurantOpenNow(vendor);
     const finalStatus = vendor.isOpen && autoOpenStatus;
     const nextOpen = getNextOpeningTime(vendor);
@@ -1444,25 +1449,34 @@ const getProfile = async (req, res) => {
           role: vendor.role
         },
         restaurantInfo: {
-          restaurantName: vendor.restaurantName,
-          cuisine: vendor.cuisine,
-          address: vendor.address,
-          logo: vendor.logo,
-          isOpen: vendor.isOpen,
+          restaurantName: restaurant?.name || vendor.restaurantName,
+          cuisine:        restaurant?.cuisine || vendor.cuisine,
+          address:        restaurant?.address || vendor.address,
+          logo:           restaurant?.logo || restaurant?.image || vendor.logo,
+          image:          restaurant?.image || vendor.logo,
+          description:    restaurant?.description || "",
+          deliveryTime:   restaurant?.deliveryTime || 30,
+          minOrder:       restaurant?.minOrder || 199,
+          isOpen:         vendor.isOpen,
           autoOpenStatus,
           finalStatus,
-          nextOpen
+          nextOpen,
+          // ✅ This is the key field for cloud kitchen detection
+          type:           restaurant?.type || "Restaurant",
+          isApproved:     restaurant?.isApproved || false,
+          rating:         restaurant?.rating || 0,
+          restaurantId:   restaurant?._id || null,
         },
         deliverySettings: vendor.deliverySettings,
-        bankDetails: vendor.bankDetails,
-        operatingHours: vendor.operatingHours
+        bankDetails:      vendor.bankDetails,
+        operatingHours:   vendor.operatingHours,
+        // Also include flat restaurant object for easy access
+        restaurant: restaurant || null,
       }
     });
 
   } catch (error) {
-    res.status(500).json({
-      message: error.message
-    });
+    res.status(500).json({ message: error.message });
   }
 };
 // UPDATE PROFILE
