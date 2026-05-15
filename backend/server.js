@@ -29,7 +29,7 @@ connectDB();
 // CORS MUST be first
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "https://quick-bite-2026.vercel.app/",
+    origin: process.env.CLIENT_URL || "https://quick-bite-2026.vercel.app",
     credentials: true,
   })
 );
