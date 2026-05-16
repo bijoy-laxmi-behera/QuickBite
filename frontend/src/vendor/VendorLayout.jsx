@@ -18,7 +18,6 @@ import Reviews          from "./pages/Reviews";
 import Profile          from "./pages/Profile";
 import Notifications    from "./pages/Notifications";
 import Settings         from "./pages/Settings";
-import Inventory        from "./pages/Inventory";
 
 export default function VendorLayout() {
   const loc      = useLocation();
