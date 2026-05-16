@@ -7,11 +7,14 @@ const DeliveryContext = createContext(null);
 
 export function DeliveryProvider({ children }) {
   const token = localStorage.getItem("token");
+
   const [partner, setPartner] = useState(() => {
     try { return JSON.parse(localStorage.getItem("user") || "null"); }
     catch { return null; }
   });
-  const [loading, setLoading] = useState(!partner);
+  const [loading, setLoading]           = useState(!partner);
+  const [isOnline, setIsOnline]         = useState(false);
+  const [statusLoading, setStatusLoading] = useState(false);
 
   useEffect(() => {
     if (!token) { setLoading(false); return; }
@@ -20,14 +23,31 @@ export function DeliveryProvider({ children }) {
       .then((r) => {
         const data = r.data?.user || r.data;
         setPartner(data);
+        setIsOnline(data?.isOnline || false);
         localStorage.setItem("user", JSON.stringify(data));
       })
       .catch(() => {})
       .finally(() => setLoading(false));
   }, [token]);
 
+  // Single shared toggle — used by both Sidebar & TopBar
+  const toggleOnlineStatus = async () => {
+    setStatusLoading(true);
+    try {
+      await axios.patch(
+        `${API}/delivery/me/status`,
+        { isOnline: !isOnline },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setIsOnline((prev) => !prev);
+    } catch {}
+    finally { setStatusLoading(false); }
+  };
+
   return (
-    <DeliveryContext.Provider value={{ partner, setPartner, token, loading }}>
+    <DeliveryContext.Provider
+      value={{ partner, setPartner, token, loading, isOnline, statusLoading, toggleOnlineStatus }}
+    >
       {children}
     </DeliveryContext.Provider>
   );

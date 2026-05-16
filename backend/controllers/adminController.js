@@ -858,12 +858,14 @@ const getCategories = async (req, res) => {
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }
 };
 
+// AFTER
 const createCategory = async (req, res) => {
   try {
     const cat = await Category.create({
       ...req.body,
-      vendor: req.user.id,
-      slug: req.body.name?.toLowerCase().replace(/\s+/g, "-")
+      // No vendor field — admin categories are platform-wide
+      slug: req.body.name?.toLowerCase().replace(/\s+/g, "-"),
+      isActive: req.body.isActive ?? true,
     });
     res.json({ success: true, data: cat });
   } catch (e) { res.status(500).json({ success: false, message: e.message }); }

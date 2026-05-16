@@ -33,7 +33,6 @@ const menuItemSchema = new mongoose.Schema(
       min: 0,
     },
 
-    // 💸 Discounted price (optional)
     discountedPrice: {
       type: Number,
       min: 0,
@@ -44,11 +43,12 @@ const menuItemSchema = new mongoose.Schema(
       default: "https://via.placeholder.com/200",
     },
 
-    // ✅ FIXED category reference
+    // ✅ category is now OPTIONAL — vendor can add items without a category
     category: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Category",
-      required: true,
+      required: false,   // ← changed from true to false
+      default: null,
     },
 
     isAvailable: {
@@ -56,13 +56,21 @@ const menuItemSchema = new mongoose.Schema(
       default: true,
     },
 
-    // 📦 Stock management
-    stock: {
-      type: Number,
-      default: -1, // -1 means unlimited
+    isveg: {
+      type: Boolean,
+      default: true,
     },
 
-    // ⭐ Ratings
+    preparationTime: {
+      type: Number,
+      default: 30,
+    },
+
+    stock: {
+      type: Number,
+      default: -1, // -1 = unlimited
+    },
+
     rating: {
       type: Number,
       default: 0,
@@ -75,17 +83,16 @@ const menuItemSchema = new mongoose.Schema(
       default: 0,
     },
 
-    // 🍕 Customization options
     variants: [
       {
-        name: String, // e.g. Small, Medium, Large
+        name: String,
         price: Number,
       },
     ],
 
     addOns: [
       {
-        name: String, // e.g. Extra Cheese
+        name: String,
         price: Number,
       },
     ],

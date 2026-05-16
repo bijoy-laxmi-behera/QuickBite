@@ -1,10 +1,10 @@
-import { NavLink } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
 import { useDelivery } from "../DeliveryContext";
 import StatusToggle from "./StatusToggle";
 import {
   LayoutDashboard, Package, Bike, TrendingUp,
   Wallet, User, Bell, HelpCircle, Award,
-  History, ChevronLeft, ChevronRight, Zap
+  History, Zap, LogOut
 } from "lucide-react";
 
 const navItems = [
@@ -20,92 +20,89 @@ const navItems = [
   { label: "Profile",        to: "/delivery/profile",         icon: User            },
 ];
 
-export default function Sidebar({ open, onToggle }) {
+export default function Sidebar() {
   const { partner } = useDelivery();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("user");
+    navigate("/login");
+  };
 
   return (
-    <aside
-      className={`relative h-screen bg-[#0D0D14] border-r border-white/5 flex flex-col transition-all duration-300 ${
-        open ? "w-60" : "w-16"
-      }`}
-    >
-      {/* Logo */}
-      <div className={`flex items-center gap-3 px-4 py-5 border-b border-white/5 ${!open && "justify-center px-0"}`}>
-        <div className="w-8 h-8 bg-orange-500 rounded-lg flex items-center justify-center flex-shrink-0">
-          <Zap size={15} className="text-white" fill="white" />
+    <aside className="h-screen w-64 bg-white border-r border-gray-100 flex flex-col shadow-sm flex-shrink-0">
+
+      {/* ── Logo ── */}
+      <div className="flex items-center gap-3 px-5 py-5 border-b border-gray-100">
+        <div className="w-9 h-9 bg-orange-500 rounded-xl flex items-center justify-center shadow-md shadow-orange-200 flex-shrink-0">
+          <Zap size={16} className="text-white" fill="white" />
         </div>
-        {open && (
-          <div>
-            <p className="text-sm font-black text-white tracking-tight">QuickBite</p>
-            <p className="text-[10px] text-zinc-500 font-medium">Delivery Partner</p>
-          </div>
-        )}
+        <div>
+          <p className="text-sm font-black text-gray-900 tracking-tight leading-none">QuickBite</p>
+          <p className="text-[10px] text-gray-400 font-medium mt-0.5">Delivery Partner</p>
+        </div>
       </div>
 
-      {/* Toggle button */}
-      <button
-        onClick={onToggle}
-        className="absolute -right-3 top-16 w-6 h-6 bg-[#0D0D14] border border-white/10 rounded-full flex items-center justify-center z-10 hover:border-orange-500/50 transition-colors"
-      >
-        {open
-          ? <ChevronLeft size={12} className="text-zinc-400" />
-          : <ChevronRight size={12} className="text-zinc-400" />
-        }
-      </button>
-
-      {/* Status toggle */}
-      <div className={`px-3 py-3 border-b border-white/5 ${!open && "flex justify-center"}`}>
-        <StatusToggle compact={!open} />
+      {/* ── Online Status Toggle ── */}
+      <div className="px-4 py-3 border-b border-gray-100">
+        <StatusToggle />
       </div>
 
-      {/* Nav items */}
-      <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
+      {/* ── Navigation ── */}
+      <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
         {navItems.map(({ label, to, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
-            title={!open ? label : undefined}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 group relative ${
+              `flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 ${
                 isActive
-                  ? "bg-orange-500/15 text-orange-400 border border-orange-500/20"
-                  : "text-zinc-500 hover:text-zinc-200 hover:bg-white/5"
-              } ${!open ? "justify-center px-0 w-10 mx-auto" : ""}`
+                  ? "bg-orange-500 text-white shadow-md shadow-orange-500/20"
+                  : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
+              }`
             }
           >
             {({ isActive }) => (
               <>
                 <Icon size={17} strokeWidth={isActive ? 2.2 : 1.8} className="flex-shrink-0" />
-                {open && <span className="truncate">{label}</span>}
-                {/* Tooltip when collapsed */}
-                {!open && (
-                  <div className="absolute left-14 bg-zinc-800 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 pointer-events-none whitespace-nowrap z-50 border border-white/10 transition-opacity">
-                    {label}
-                  </div>
-                )}
+                <span className="truncate">{label}</span>
               </>
             )}
           </NavLink>
         ))}
       </nav>
 
-      {/* Partner info at bottom */}
-      {open && partner && (
-        <div className="px-3 py-4 border-t border-white/5">
-          <div className="flex items-center gap-3 bg-white/5 rounded-xl px-3 py-2.5">
-            <div className="w-8 h-8 rounded-full bg-orange-500/20 flex items-center justify-center flex-shrink-0 overflow-hidden">
-              {partner.avatar
-                ? <img src={partner.avatar} alt="" className="w-full h-full object-cover" />
-                : <User size={15} className="text-orange-400" />
-              }
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-semibold text-white truncate">{partner.name}</p>
-              <p className="text-[10px] text-zinc-500 truncate">{partner.email}</p>
-            </div>
+      {/* ── Profile + Logout ── */}
+      <div className="px-3 py-4 border-t border-gray-100 space-y-2">
+        {/* Profile card — clicks to profile page */}
+        <NavLink
+          to="/delivery/profile"
+          className="flex items-center gap-3 px-3.5 py-2.5 rounded-xl hover:bg-gray-100 transition-colors group cursor-pointer"
+        >
+          <div className="w-8 h-8 rounded-full bg-orange-100 border border-orange-200 overflow-hidden flex items-center justify-center flex-shrink-0">
+            {partner?.avatar
+              ? <img src={partner.avatar} alt="" className="w-full h-full object-cover" />
+              : <User size={14} className="text-orange-500" />
+            }
           </div>
-        </div>
-      )}
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-semibold text-gray-800 truncate leading-none">
+              {partner?.name || "Partner"}
+            </p>
+            <p className="text-[10px] text-gray-400 truncate mt-0.5">{partner?.email}</p>
+          </div>
+        </NavLink>
+
+        {/* Logout button */}
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-sm font-medium text-red-500 hover:bg-red-50 hover:text-red-600 transition-all duration-150"
+        >
+          <LogOut size={17} strokeWidth={1.8} className="flex-shrink-0" />
+          <span>Logout</span>
+        </button>
+      </div>
     </aside>
   );
 }

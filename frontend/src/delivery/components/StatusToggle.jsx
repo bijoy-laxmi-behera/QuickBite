@@ -1,38 +1,21 @@
-import { useState } from "react";
-import axios from "axios";
+import { useDelivery } from "../DeliveryContext";
 
-const API = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
-
+// No local state — reads from DeliveryContext so Sidebar & TopBar are always in sync
 export default function StatusToggle({ compact = false }) {
-  const [isOnline, setIsOnline] = useState(false);
-  const [loading, setLoading]   = useState(false);
-  const token = localStorage.getItem("token");
-
-  const toggle = async () => {
-    setLoading(true);
-    try {
-      await axios.patch(
-        `${API}/delivery/me/status`,
-        { isOnline: !isOnline },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setIsOnline(p => !p);
-    } catch {}
-    finally { setLoading(false); }
-  };
+  const { isOnline, statusLoading, toggleOnlineStatus } = useDelivery();
 
   if (compact) {
     return (
       <button
-        onClick={toggle}
-        title={isOnline ? "Online" : "Offline"}
-        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all ${
-          isOnline ? "bg-emerald-500/20" : "bg-zinc-800"
+        onClick={toggleOnlineStatus}
+        title={isOnline ? "Go Offline" : "Go Online"}
+        className={`w-8 h-8 rounded-lg flex items-center justify-center transition-all border ${
+          isOnline ? "bg-emerald-50 border-emerald-200" : "bg-gray-100 border-gray-200"
         }`}
       >
-        <span className={`w-2.5 h-2.5 rounded-full ${
-          loading ? "bg-amber-400 animate-pulse" :
-          isOnline ? "bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.9)]" : "bg-zinc-600"
+        <span className={`w-2.5 h-2.5 rounded-full transition-all ${
+          statusLoading ? "bg-amber-400 animate-pulse" :
+          isOnline      ? "bg-emerald-500 shadow-[0_0_8px_rgba(52,211,153,0.7)]" : "bg-gray-400"
         }`} />
       </button>
     );
@@ -40,19 +23,19 @@ export default function StatusToggle({ compact = false }) {
 
   return (
     <button
-      onClick={toggle}
-      disabled={loading}
-      className={`flex items-center gap-2 px-3 py-1.5 rounded-lg border text-xs font-bold tracking-wider transition-all duration-200 ${
+      onClick={toggleOnlineStatus}
+      disabled={statusLoading}
+      className={`flex items-center gap-2.5 px-4 py-2 rounded-xl border text-xs font-bold tracking-wider transition-all duration-200 ${
         isOnline
-          ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
-          : "bg-zinc-800/80 border-zinc-700 text-zinc-500"
+          ? "bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100"
+          : "bg-gray-100 border-gray-200 text-gray-500 hover:bg-gray-200"
       }`}
     >
-      <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${
-        loading ? "bg-amber-400 animate-pulse" :
-        isOnline ? "bg-emerald-400 shadow-[0_0_6px_rgba(52,211,153,0.9)]" : "bg-zinc-600"
+      <span className={`w-2 h-2 rounded-full flex-shrink-0 transition-all ${
+        statusLoading ? "bg-amber-400 animate-pulse" :
+        isOnline      ? "bg-emerald-500 shadow-[0_0_6px_rgba(52,211,153,0.8)]" : "bg-gray-400"
       }`} />
-      {loading ? "..." : isOnline ? "ONLINE" : "OFFLINE"}
+      {statusLoading ? "Updating…" : isOnline ? "ONLINE" : "OFFLINE"}
     </button>
   );
 }
