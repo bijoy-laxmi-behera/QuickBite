@@ -144,7 +144,7 @@ const updateMyProfile = async (req, res) => {
 const getAllRestaurants = async (req, res) => {
   try {
     const restaurants = await Restaurant.find()
-      .populate('owner', 'name email phone')  // ← ADD THIS LINE
+      .populate('owner', 'name email phone')
       .sort({ createdAt: -1 });
     res.json(restaurants);
   } catch (error) {
@@ -427,12 +427,8 @@ const updateOrderStatus = async (req, res) => {
   try {
     const { status } = req.body;
     const validStatuses = [
-      "pending",
-      "accepted",
-      "preparing",
-      "out_for_delivery",
-      "delivered",
-      "cancelled",
+      "pending", "accepted", "preparing",
+      "out_for_delivery", "delivered", "cancelled",
     ];
     if (!validStatuses.includes(status)) {
       return res.status(400).json({ message: "Invalid status" });
@@ -475,13 +471,7 @@ const getAllAgents = async (req, res) => {
 const createAgent = async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
-    const agent = await User.create({
-      name,
-      email,
-      password,
-      phone,
-      role: "deliveryPartner",
-    });
+    const agent = await User.create({ name, email, password, phone, role: "deliveryPartner" });
     res.status(201).json({ message: "Agent created", agent });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -585,7 +575,7 @@ const getPaymentSummary = async (req, res) => {
       { $group: { _id: null, total: { $sum: "$totalAmount" } } },
     ]);
 
-    const totalTransactions = await Order.countDocuments({ paymentStatus: { $exists: true } });
+    const totalTransactions  = await Order.countDocuments({ paymentStatus: { $exists: true } });
     const successfulPayments = await Order.countDocuments({ paymentStatus: "paid" });
     const refundedAmount = await Order.aggregate([
       { $match: { paymentStatus: "refunded" } },
@@ -593,11 +583,13 @@ const getPaymentSummary = async (req, res) => {
     ]);
 
     res.json({
-      totalRevenue: totalRevenue[0]?.total || 0,
+      totalRevenue:       totalRevenue[0]?.total || 0,
       totalTransactions,
       successfulPayments,
-      refundedAmount: refundedAmount[0]?.total || 0,
-      averageTransaction: totalTransactions > 0 ? (totalRevenue[0]?.total || 0) / totalTransactions : 0,
+      refundedAmount:     refundedAmount[0]?.total || 0,
+      averageTransaction: totalTransactions > 0
+        ? (totalRevenue[0]?.total || 0) / totalTransactions
+        : 0,
     });
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -628,15 +620,9 @@ const validateCoupon = async (req, res) => {
       discount = coupon.discountValue;
     } else {
       discount = (amount * coupon.discountValue) / 100;
-      if (coupon.maxDiscount) {
-        discount = Math.min(discount, coupon.maxDiscount);
-      }
+      if (coupon.maxDiscount) discount = Math.min(discount, coupon.maxDiscount);
     }
-    res.json({
-      valid: true,
-      discount,
-      finalAmount: amount - discount,
-    });
+    res.json({ valid: true, discount, finalAmount: amount - discount });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -651,10 +637,42 @@ const getAllCoupons = async (req, res) => {
   }
 };
 
+// ✅ FIX: explicitly mark every admin-created coupon as isAdminCoupon: true
+// so vendors can see and opt in to it via GET /vendor/coupons
 const createCoupon = async (req, res) => {
   try {
-    const coupon = await Coupon.create(req.body);
-    res.status(201).json({ message: "Coupon created", coupon });
+    const {
+      code, discountType, discountValue, minOrderAmount,
+      maxDiscount, validFrom, validTo, usageLimit, description,
+    } = req.body;
+
+    if (!code || !discountType || !discountValue) {
+      return res.status(400).json({ message: "Code, type, and value are required" });
+    }
+
+    const exists = await Coupon.findOne({ code: code.toUpperCase() });
+    if (exists) return res.status(400).json({ message: "Coupon code already exists" });
+
+    const coupon = await Coupon.create({
+      code:             code.toUpperCase().trim(),
+      discountType,
+      discountValue:    Number(discountValue),
+      minOrderAmount:   Number(minOrderAmount) || 0,
+      maxDiscount:      discountType === "percentage" ? (Number(maxDiscount) || 0) : null,
+      validFrom:        validFrom || new Date(),
+      validTo:          validTo   || null,
+      usageLimit:       Number(usageLimit) || null,
+      usedCount:        0,
+      isActive:         true,
+      description:      description || "",
+      // ── Admin coupon flags ──────────────────────────────
+      vendor:           null,          // not tied to any specific vendor
+      createdBy:        req.user._id,  // admin's user ID
+      isAdminCoupon:    true,          // visible to all vendors to opt in
+      vendorAcceptedBy: [],            // no vendor has opted in yet
+    });
+
+    res.status(201).json({ success: true, message: "Coupon created", coupon });
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -698,8 +716,8 @@ const toggleCoupon = async (req, res) => {
 // ============ ANALYTICS CONTROLLERS ============
 const getOverview = async (req, res) => {
   try {
-    const totalOrders = await Order.countDocuments();
-    const totalUsers = await User.countDocuments({ role: "user" });
+    const totalOrders      = await Order.countDocuments();
+    const totalUsers       = await User.countDocuments({ role: "user" });
     const totalRestaurants = await User.countDocuments({ role: "vendor" });
     const revenueData = await Order.aggregate([
       { $match: { status: "delivered" } },
@@ -721,19 +739,16 @@ const getRevenueAnalytics = async (req, res) => {
     const { startDate, endDate } = req.query;
     const match = { status: "delivered" };
     if (startDate && endDate) {
-      match.createdAt = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate),
-      };
+      match.createdAt = { $gte: new Date(startDate), $lte: new Date(endDate) };
     }
     const revenue = await Order.aggregate([
       { $match: match },
       {
         $group: {
           _id: {
-            year: { $year: "$createdAt" },
+            year:  { $year: "$createdAt" },
             month: { $month: "$createdAt" },
-            day: { $dayOfMonth: "$createdAt" },
+            day:   { $dayOfMonth: "$createdAt" },
           },
           totalRevenue: { $sum: "$totalAmount" },
         },
@@ -749,12 +764,7 @@ const getRevenueAnalytics = async (req, res) => {
 const getOrderAnalytics = async (req, res) => {
   try {
     const stats = await Order.aggregate([
-      {
-        $group: {
-          _id: "$status",
-          count: { $sum: 1 },
-        },
-      },
+      { $group: { _id: "$status", count: { $sum: 1 } } },
     ]);
     res.json(stats);
   } catch (error) {
@@ -766,24 +776,11 @@ const getTopRestaurants = async (req, res) => {
   try {
     const top = await Order.aggregate([
       { $match: { status: "delivered" } },
-      {
-        $group: {
-          _id: "$vendor",
-          totalOrders: { $sum: 1 },
-          revenue: { $sum: "$totalAmount" },
-        },
-      },
+      { $group: { _id: "$vendor", totalOrders: { $sum: 1 }, revenue: { $sum: "$totalAmount" } } },
       { $sort: { revenue: -1 } },
       { $limit: 5 },
-      {
-        $lookup: {
-          from: "restaurants",
-          localField: "_id",
-          foreignField: "_id",
-          as: "restaurant",
-        },
-      },
-      { $unwind: "$restaurant" }
+      { $lookup: { from: "restaurants", localField: "_id", foreignField: "_id", as: "restaurant" } },
+      { $unwind: "$restaurant" },
     ]);
     res.json(top);
   } catch (error) {
@@ -794,12 +791,7 @@ const getTopRestaurants = async (req, res) => {
 const getPeakHours = async (req, res) => {
   try {
     const data = await Order.aggregate([
-      {
-        $group: {
-          _id: { hour: { $hour: "$createdAt" } },
-          totalOrders: { $sum: 1 },
-        },
-      },
+      { $group: { _id: { hour: { $hour: "$createdAt" } }, totalOrders: { $sum: 1 } } },
       { $sort: { "_id.hour": 1 } },
     ]);
     res.json(data);
@@ -812,9 +804,7 @@ const getPeakHours = async (req, res) => {
 const getSettings = async (req, res) => {
   try {
     let settings = await Setting.findOne();
-    if (!settings) {
-      settings = await Setting.create({});
-    }
+    if (!settings) settings = await Setting.create({});
     res.json(settings);
   } catch (error) {
     res.status(500).json({ message: error.message });
@@ -824,24 +814,14 @@ const getSettings = async (req, res) => {
 const updateSettings = async (req, res) => {
   try {
     let settings = await Setting.findOne();
-    if (!settings) {
-      settings = await Setting.create({});
-    }
+    if (!settings) settings = await Setting.create({});
     const allowedFields = [
-      "deliveryFee",
-      "serviceFee",
-      "taxRate",
-      "maxDeliveryDistance",
-      "currency",
-      "maintenanceMode",
-      "supportEmail",
-      "allowCOD",
-      "allowOnlinePayment",
+      "deliveryFee", "serviceFee", "taxRate", "maxDeliveryDistance",
+      "currency", "maintenanceMode", "supportEmail",
+      "allowCOD", "allowOnlinePayment",
     ];
-    allowedFields.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        settings[field] = req.body[field];
-      }
+    allowedFields.forEach(field => {
+      if (req.body[field] !== undefined) settings[field] = req.body[field];
     });
     await settings.save();
     res.json({ message: "Settings updated", settings });
@@ -855,34 +835,40 @@ const getCategories = async (req, res) => {
   try {
     const cats = await Category.find().sort({ order: 1, createdAt: -1 });
     res.json({ success: true, data: cats });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
 };
 
-// AFTER
 const createCategory = async (req, res) => {
   try {
     const cat = await Category.create({
       ...req.body,
-      // No vendor field — admin categories are platform-wide
-      slug: req.body.name?.toLowerCase().replace(/\s+/g, "-"),
+      slug:     req.body.name?.toLowerCase().replace(/\s+/g, "-"),
       isActive: req.body.isActive ?? true,
     });
     res.json({ success: true, data: cat });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
 };
 
 const updateCategory = async (req, res) => {
   try {
     const cat = await Category.findByIdAndUpdate(req.params.id, req.body, { new: true });
     res.json({ success: true, data: cat });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
 };
 
 const deleteCategory = async (req, res) => {
   try {
     await Category.findByIdAndDelete(req.params.id);
     res.json({ success: true, message: "Deleted" });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
 };
 
 const toggleCategory = async (req, res) => {
@@ -892,75 +878,39 @@ const toggleCategory = async (req, res) => {
     cat.isActive = !cat.isActive;
     await cat.save();
     res.json({ success: true, data: cat });
-  } catch (e) { res.status(500).json({ success: false, message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ success: false, message: e.message });
+  }
 };
 
 module.exports = {
   // User
-  getAllUsers,
-  getUserById,
-  updateUser,
-  deleteUser,
-  blockUser,
-  unblockUser,
-  getUserStats,
-  getMyProfile,
-  updateMyProfile,
+  getAllUsers, getUserById, updateUser, deleteUser,
+  blockUser, unblockUser, getUserStats,
+  getMyProfile, updateMyProfile,
   // Restaurant
-  getAllRestaurants,
-  getRestaurantById,
-  createRestaurant,
-  updateRestaurant,
-  deleteRestaurant,
-  toggleRestaurantStatus,
-  getPendingRestaurants,
-  approveRestaurant,
-  rejectRestaurant,
-  getRestaurantOrders,
-  getRestaurantMenu,
+  getAllRestaurants, getRestaurantById, createRestaurant,
+  updateRestaurant, deleteRestaurant, toggleRestaurantStatus,
+  getPendingRestaurants, approveRestaurant, rejectRestaurant,
+  getRestaurantOrders, getRestaurantMenu,
   // Menu
-  searchMenuItems,
-  createMenuItem,
-  updateMenuItem,
-  deleteMenuItem,
-  toggleAvailability,
+  searchMenuItems, createMenuItem, updateMenuItem,
+  deleteMenuItem, toggleAvailability,
   // Order
-  getAllOrders,
-  updateOrderStatus,
-  getLiveOrders,
+  getAllOrders, updateOrderStatus, getLiveOrders,
   // Delivery Agents
-  getAllAgents,
-  createAgent,
-  updateAgent,
-  deleteAgent,
-  toggleAgentStatus,
-  getAgentDeliveries,
+  getAllAgents, createAgent, updateAgent,
+  deleteAgent, toggleAgentStatus, getAgentDeliveries,
   // Payment
-  getAllPayments,
-  getPaymentById,
-  refundPayment,
-  getPaymentSummary,
+  getAllPayments, getPaymentById, refundPayment, getPaymentSummary,
   // Coupon
-  validateCoupon,
-  getAllCoupons,
-  createCoupon,
-  updateCoupon,
-  deleteCoupon,
-  toggleCoupon,
+  validateCoupon, getAllCoupons, createCoupon,
+  updateCoupon, deleteCoupon, toggleCoupon,
   // Analytics
-  getOverview,
-  getRevenueAnalytics,
-  getOrderAnalytics,
-  getTopRestaurants,
-  getPeakHours,
+  getOverview, getRevenueAnalytics, getOrderAnalytics,
+  getTopRestaurants, getPeakHours,
   // Settings
-  getSettings,
-  updateSettings,
-
+  getSettings, updateSettings,
   // Categories
-getCategories,
-createCategory,
-updateCategory,
-deleteCategory,
-toggleCategory,
+  getCategories, createCategory, updateCategory, deleteCategory, toggleCategory,
 };

@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import axios from "axios";
 import {
-  Wallet as WalletIcon, ArrowDownToLine, ArrowUpRight,
-  ArrowDownRight, Clock, CheckCircle, XCircle
+  Wallet as WalletIcon,
+  ArrowDownToLine,
+  ArrowUpRight,
+  ArrowDownRight,
+  Clock,
+  CheckCircle,
+  XCircle,
 } from "lucide-react";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
@@ -12,33 +17,60 @@ export default function Wallet() {
   const [txns, setTxns]     = useState([]);
   const [wds, setWds]       = useState([]);
   const [modal, setModal]   = useState(false);
-  const [form, setForm]     = useState({ amount: "", method: "upi", upiId: "" });
+  const [form, setForm]     = useState({ amount: "", paymentMethod: "upi", upiId: "" });
   const [busy, setBusy]     = useState(false);
+  const [error, setError]   = useState("");
   const token = localStorage.getItem("token");
 
-  useEffect(() => {
+  const fetchWallet = async () => {
     const h = { Authorization: `Bearer ${token}` };
-    Promise.all([
-      axios.get(`${API}/delivery/wallet`,              { headers: h }),
-      axios.get(`${API}/delivery/wallet/transactions`, { headers: h }),
-      axios.get(`${API}/delivery/wallet/withdrawals`,  { headers: h }),
-    ])
-      .then(([w, t, d]) => {
-        setWallet(w.data?.data || w.data);
-        setTxns(Array.isArray(t.data?.data ?? t.data) ? (t.data?.data ?? t.data) : []);
-        setWds(Array.isArray(d.data?.data  ?? d.data)  ? (d.data?.data  ?? d.data)  : []);
-      }).catch(() => {});
-  }, [token]);
+    try {
+      const [w, t, d] = await Promise.all([
+        axios.get(`${API}/delivery/wallet`,              { headers: h }),
+        axios.get(`${API}/delivery/wallet/transactions`, { headers: h }),
+        axios.get(`${API}/delivery/wallet/withdrawals`,  { headers: h }),
+      ]);
+      setWallet(w.data?.data || w.data);
+      setTxns(Array.isArray(t.data?.data ?? t.data) ? (t.data?.data ?? t.data) : []);
+      setWds(Array.isArray(d.data?.data  ?? d.data)  ? (d.data?.data  ?? d.data)  : []);
+    } catch {}
+  };
+
+  useEffect(() => { fetchWallet(); }, [token]);
 
   const handleWithdraw = async () => {
+    setError("");
+    const amount = Number(form.amount);
+
+    // Frontend validation
+    if (!amount || amount < 50) {
+      setError("Minimum withdrawal amount is ₹50");
+      return;
+    }
+    if (form.paymentMethod === "upi" && !form.upiId.trim()) {
+      setError("Please enter your UPI ID");
+      return;
+    }
+    if ((wallet?.balance || 0) < amount) {
+      setError(`Insufficient balance. Available: ₹${wallet?.balance || 0}`);
+      return;
+    }
+
     setBusy(true);
     try {
-      await axios.post(`${API}/delivery/wallet/withdraw`, form, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.post(
+        `${API}/delivery/wallet/withdraw`,
+        { ...form, amount }, // ✅ amount as number
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setModal(false);
-      const { data } = await axios.get(`${API}/delivery/wallet`, { headers: { Authorization: `Bearer ${token}` } });
-      setWallet(data?.data || data);
-    } catch (e) { alert(e.response?.data?.message || "Failed"); }
-    finally { setBusy(false); }
+      setForm({ amount: "", paymentMethod: "upi", upiId: "" });
+      await fetchWallet();
+    } catch (e) {
+      setError(e.response?.data?.message || "Withdrawal failed. Please try again.");
+    } finally {
+      setBusy(false);
+    }
   };
 
   const wdIcon = {
@@ -58,12 +90,22 @@ export default function Wallet() {
             <WalletIcon size={16} className="text-orange-500" />
             <span className="text-xs text-orange-400 font-bold uppercase tracking-widest">Available Balance</span>
           </div>
-          <p className="text-4xl font-black text-gray-900">₹<span className="text-orange-500">{(wallet?.balance || 0).toLocaleString("en-IN")}</span></p>
-          {wallet?.pendingBalance > 0 && <p className="text-xs text-gray-400">+ ₹{wallet.pendingBalance} pending</p>}
-          <button onClick={() => setModal(true)} disabled={!wallet?.balance || wallet.balance < 50}
-            className="w-full flex items-center justify-center gap-2 py-3 bg-orange-500 hover:bg-orange-400 rounded-xl text-white font-bold text-sm transition-colors disabled:opacity-40 shadow-md shadow-orange-500/20">
+          <p className="text-4xl font-black text-gray-900">
+            ₹<span className="text-orange-500">{(wallet?.balance || 0).toLocaleString("en-IN")}</span>
+          </p>
+          {wallet?.pendingBalance > 0 && (
+            <p className="text-xs text-gray-400">+ ₹{wallet.pendingBalance} pending</p>
+          )}
+          <button
+            onClick={() => { setError(""); setModal(true); }}
+            disabled={!wallet?.balance || wallet.balance < 50}
+            className="w-full flex items-center justify-center gap-2 py-3 bg-orange-500 hover:bg-orange-400 rounded-xl text-white font-bold text-sm transition-colors disabled:opacity-40 shadow-md shadow-orange-500/20"
+          >
             <ArrowDownToLine size={15} /> Withdraw
           </button>
+          {(!wallet?.balance || wallet.balance < 50) && (
+            <p className="text-[10px] text-gray-400 text-center">Minimum ₹50 balance required to withdraw</p>
+          )}
         </div>
 
         <div className="lg:col-span-2 grid grid-cols-3 gap-4">
@@ -87,28 +129,32 @@ export default function Wallet() {
             <h3 className="text-sm font-bold text-gray-900">Transactions</h3>
           </div>
           <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
-            {txns.length === 0 ? <p className="text-gray-400 text-sm text-center py-8">No transactions</p>
-            : txns.map(tx => (
-              <div key={tx._id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${tx.type === "credit" ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"}`}>
-                    {tx.type === "credit"
-                      ? <ArrowUpRight size={14} className="text-emerald-500" />
-                      : <ArrowDownRight size={14} className="text-red-500" />
-                    }
+            {txns.length === 0
+              ? <p className="text-gray-400 text-sm text-center py-8">No transactions yet</p>
+              : txns.map(tx => (
+                <div key={tx._id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center border ${
+                      tx.type === "credit" ? "bg-emerald-50 border-emerald-200" : "bg-red-50 border-red-200"
+                    }`}>
+                      {tx.type === "credit"
+                        ? <ArrowUpRight size={14} className="text-emerald-500" />
+                        : <ArrowDownRight size={14} className="text-red-500" />
+                      }
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-gray-700">{tx.description || "Earning"}</p>
+                      <p className="text-xs text-gray-400">
+                        {new Date(tx.createdAt).toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}
+                      </p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-medium text-gray-700">{tx.description || "Earning"}</p>
-                    <p className="text-xs text-gray-400">
-                      {new Date(tx.createdAt).toLocaleDateString("en-IN", { day:"2-digit", month:"short" })}
-                    </p>
-                  </div>
+                  <span className={`text-sm font-black ${tx.type === "credit" ? "text-emerald-500" : "text-red-500"}`}>
+                    {tx.type === "credit" ? "+" : "-"}₹{tx.amount}
+                  </span>
                 </div>
-                <span className={`text-sm font-black ${tx.type === "credit" ? "text-emerald-500" : "text-red-500"}`}>
-                  {tx.type === "credit" ? "+" : "-"}₹{tx.amount}
-                </span>
-              </div>
-            ))}
+              ))
+            }
           </div>
         </div>
 
@@ -117,27 +163,29 @@ export default function Wallet() {
             <h3 className="text-sm font-bold text-gray-900">Withdrawal Requests</h3>
           </div>
           <div className="divide-y divide-gray-100 max-h-72 overflow-y-auto">
-            {wds.length === 0 ? <p className="text-gray-400 text-sm text-center py-8">No requests yet</p>
-            : wds.map(w => (
-              <div key={w._id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-2">
-                  {wdIcon[w.status] || wdIcon.pending}
-                  <div>
-                    <p className="text-sm font-semibold text-gray-700">₹{w.amount}</p>
-                    <p className="text-xs text-gray-400">
-                      {w.paymentMethod?.toUpperCase()} · {new Date(w.createdAt).toLocaleDateString("en-IN")}
-                    </p>
+            {wds.length === 0
+              ? <p className="text-gray-400 text-sm text-center py-8">No requests yet</p>
+              : wds.map(w => (
+                <div key={w._id} className="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-2">
+                    {wdIcon[w.status] || wdIcon.pending}
+                    <div>
+                      <p className="text-sm font-semibold text-gray-700">₹{w.amount}</p>
+                      <p className="text-xs text-gray-400">
+                        {w.paymentMethod?.toUpperCase()} · {new Date(w.createdAt).toLocaleDateString("en-IN")}
+                      </p>
+                    </div>
                   </div>
+                  <span className={`text-[11px] font-bold capitalize px-2.5 py-1 rounded-full border ${
+                    w.status === "completed" ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
+                    w.status === "failed"    ? "bg-red-50 border-red-200 text-red-600"             :
+                    "bg-amber-50 border-amber-200 text-amber-600"
+                  }`}>
+                    {w.status}
+                  </span>
                 </div>
-                <span className={`text-[11px] font-bold capitalize px-2.5 py-1 rounded-full border ${
-                  w.status === "completed" ? "bg-emerald-50 border-emerald-200 text-emerald-600" :
-                  w.status === "failed"    ? "bg-red-50 border-red-200 text-red-600"             :
-                  "bg-amber-50 border-amber-200 text-amber-600"
-                }`}>
-                  {w.status}
-                </span>
-              </div>
-            ))}
+              ))
+            }
           </div>
         </div>
       </div>
@@ -148,23 +196,43 @@ export default function Wallet() {
           <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-sm space-y-4 shadow-2xl">
             <div className="flex justify-between items-center">
               <h3 className="text-base font-black text-gray-900">Withdraw Funds</h3>
-              <button onClick={() => setModal(false)} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
+              <button onClick={() => { setModal(false); setError(""); }} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
             </div>
+
+            {/* Available balance hint */}
+            <div className="bg-orange-50 border border-orange-100 rounded-xl px-4 py-2 flex justify-between text-xs">
+              <span className="text-gray-500">Available balance</span>
+              <span className="font-black text-orange-500">₹{(wallet?.balance || 0).toLocaleString("en-IN")}</span>
+            </div>
+
+            {/* Error */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-600 font-medium">
+                ⚠️ {error}
+              </div>
+            )}
+
             <div className="space-y-3">
               <div>
                 <label className="text-xs text-gray-400 font-semibold">Amount (min ₹50)</label>
-                <input type="number" value={form.amount}
-                  onChange={e => setForm(p => ({ ...p, amount: e.target.value }))}
+                <input
+                  type="number"
+                  value={form.amount}
+                  onChange={e => { setError(""); setForm(p => ({ ...p, amount: e.target.value })); }}
                   placeholder="Enter amount"
-                  className="mt-1 w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 text-sm focus:outline-none focus:border-orange-500 transition-colors" />
+                  min={50}
+                  max={wallet?.balance || 0}
+                  className="mt-1 w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 text-sm focus:outline-none focus:border-orange-500 transition-colors"
+                />
               </div>
               <div>
                 <label className="text-xs text-gray-400 font-semibold">Method</label>
                 <div className="flex gap-2 mt-1">
                   {["upi", "bank"].map(m => (
-                    <button key={m} onClick={() => setForm(p => ({ ...p, method: m }))}
+                    <button key={m}
+                      onClick={() => { setError(""); setForm(p => ({ ...p, paymentMethod: m })); }}
                       className={`flex-1 py-2.5 rounded-xl text-sm font-bold border transition-all ${
-                        form.method === m
+                        form.paymentMethod === m
                           ? "bg-orange-500 border-orange-500 text-white"
                           : "bg-gray-100 border-gray-200 text-gray-500 hover:border-gray-300"
                       }`}>
@@ -173,18 +241,40 @@ export default function Wallet() {
                   ))}
                 </div>
               </div>
-              {form.method === "upi" && (
+
+              {form.paymentMethod === "upi" && (
                 <div>
                   <label className="text-xs text-gray-400 font-semibold">UPI ID</label>
-                  <input type="text" value={form.upiId}
-                    onChange={e => setForm(p => ({ ...p, upiId: e.target.value }))}
+                  <input
+                    type="text"
+                    value={form.upiId}
+                    onChange={e => { setError(""); setForm(p => ({ ...p, upiId: e.target.value })); }}
                     placeholder="yourname@upi"
-                    className="mt-1 w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 text-sm focus:outline-none focus:border-orange-500 transition-colors" />
+                    className="mt-1 w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 text-sm focus:outline-none focus:border-orange-500 transition-colors"
+                  />
+                </div>
+              )}
+
+              {form.paymentMethod === "bank" && (
+                <div className="space-y-2">
+                  <div>
+                    <label className="text-xs text-gray-400 font-semibold">Account Number</label>
+                    <input type="text" placeholder="Enter account number"
+                      onChange={e => setForm(p => ({ ...p, bankDetails: { ...p.bankDetails, accountNumber: e.target.value } }))}
+                      className="mt-1 w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 text-sm focus:outline-none focus:border-orange-500 transition-colors" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-400 font-semibold">IFSC Code</label>
+                    <input type="text" placeholder="Enter IFSC code"
+                      onChange={e => setForm(p => ({ ...p, bankDetails: { ...p.bankDetails, ifsc: e.target.value } }))}
+                      className="mt-1 w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-3 text-gray-900 text-sm focus:outline-none focus:border-orange-500 transition-colors" />
+                  </div>
                 </div>
               )}
             </div>
+
             <div className="flex gap-2 pt-1">
-              <button onClick={() => setModal(false)}
+              <button onClick={() => { setModal(false); setError(""); }}
                 className="flex-1 py-3 bg-gray-100 border border-gray-200 rounded-xl text-gray-500 font-semibold text-sm hover:bg-gray-200 transition-colors">
                 Cancel
               </button>

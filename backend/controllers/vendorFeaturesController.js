@@ -12,12 +12,80 @@ const Notification = require("../models/Notification");
 // COUPON CONTROLLERS
 // ============================================================
 
+// GET /vendor/coupons
+// Returns:
+//   - All admin-created coupons (isAdminCoupon: true), with a `vendorAccepted`
+//     boolean showing whether THIS vendor has opted in
+//   - All coupons created by this vendor themselves
 const getCoupons = async (req, res) => {
   try {
-    const restaurant = await Restaurant.findOne({ owner: req.user._id });
-    const coupons = await Coupon.find({ vendor: req.user._id }).sort({ createdAt: -1 });
-    res.json({ success: true, data: coupons });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+    const vendorId = req.user._id;
+
+    // Fetch admin coupons + this vendor's own coupons in one query
+    const coupons = await Coupon.find({
+      $or: [
+        { isAdminCoupon: true },          // platform-wide admin coupons
+        { vendor: vendorId },             // vendor's own coupons
+      ],
+    }).sort({ createdAt: -1 });
+
+    // Attach a virtual `vendorAccepted` field for admin coupons
+    const result = coupons.map(c => {
+      const obj = c.toObject();
+      if (obj.isAdminCoupon) {
+        obj.vendorAccepted = (c.vendorAcceptedBy || [])
+          .some(id => id.toString() === vendorId.toString());
+      } else {
+        // Vendor's own coupon — always "accepted" (they own it)
+        obj.vendorAccepted = true;
+      }
+      return obj;
+    });
+
+    res.json({ success: true, data: result });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+};
+
+// PATCH /vendor/coupons/:id/accept
+// Body: { accepted: true | false }
+// Vendor opts in or out of an admin coupon
+const acceptCoupon = async (req, res) => {
+  try {
+    const vendorId = req.user._id;
+    const { accepted } = req.body;
+
+    const coupon = await Coupon.findOne({ _id: req.params.id, isAdminCoupon: true });
+    if (!coupon) {
+      return res.status(404).json({ message: "Admin coupon not found" });
+    }
+
+    if (accepted) {
+      // Add vendor to accepted list (avoid duplicates)
+      if (!coupon.vendorAcceptedBy.some(id => id.toString() === vendorId.toString())) {
+        coupon.vendorAcceptedBy.push(vendorId);
+      }
+    } else {
+      // Remove vendor from accepted list
+      coupon.vendorAcceptedBy = coupon.vendorAcceptedBy.filter(
+        id => id.toString() !== vendorId.toString()
+      );
+    }
+
+    await coupon.save();
+
+    res.json({
+      success: true,
+      message: accepted ? "Opted in to coupon" : "Opted out of coupon",
+      data: {
+        ...coupon.toObject(),
+        vendorAccepted: accepted,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const createCoupon = async (req, res) => {
@@ -36,7 +104,7 @@ const createCoupon = async (req, res) => {
 
     const coupon = await Coupon.create({
       code:           code.toUpperCase().trim(),
-      discountType:   discountType,   // "percentage" | "flat"
+      discountType,
       discountValue:  Number(discountValue),
       minOrderAmount: Number(minOrderAmount) || 0,
       maxDiscount:    discountType === "percentage" ? (Number(maxDiscount) || 0) : null,
@@ -46,11 +114,15 @@ const createCoupon = async (req, res) => {
       usedCount:      0,
       isActive:       true,
       vendor:         req.user._id,
+      createdBy:      req.user._id,
+      isAdminCoupon:  false,
       description:    description || "",
     });
 
     res.status(201).json({ success: true, data: coupon, message: "Coupon created" });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const updateCoupon = async (req, res) => {
@@ -60,14 +132,18 @@ const updateCoupon = async (req, res) => {
     Object.assign(coupon, req.body);
     await coupon.save();
     res.json({ success: true, data: coupon });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const deleteCoupon = async (req, res) => {
   try {
     await Coupon.findOneAndDelete({ _id: req.params.id, vendor: req.user._id });
     res.json({ success: true, message: "Coupon deleted" });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const toggleCoupon = async (req, res) => {
@@ -76,8 +152,14 @@ const toggleCoupon = async (req, res) => {
     if (!coupon) return res.status(404).json({ message: "Coupon not found" });
     coupon.isActive = !coupon.isActive;
     await coupon.save();
-    res.json({ success: true, data: coupon, message: `Coupon ${coupon.isActive ? "activated" : "deactivated"}` });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+    res.json({
+      success: true,
+      data: coupon,
+      message: `Coupon ${coupon.isActive ? "activated" : "deactivated"}`,
+    });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 // ============================================================
@@ -87,7 +169,7 @@ const toggleCoupon = async (req, res) => {
 const getAnalytics = async (req, res) => {
   try {
     const vendorId = req.user._id;
-    const { period = "7" } = req.query; // days
+    const { period = "7" } = req.query;
     const from = new Date();
     from.setDate(from.getDate() - parseInt(period));
 
@@ -96,7 +178,6 @@ const getAnalytics = async (req, res) => {
       createdAt: { $gte: from },
     }).populate("items.menuItem", "name price");
 
-    // Daily revenue
     const dailyRevenue = {};
     orders.forEach(o => {
       const d = o.createdAt.toISOString().split("T")[0];
@@ -105,35 +186,30 @@ const getAnalytics = async (req, res) => {
       dailyRevenue[d].orders  += 1;
     });
 
-    // Status breakdown
     const statusCount = {};
     orders.forEach(o => {
       statusCount[o.status] = (statusCount[o.status] || 0) + 1;
     });
 
-    // Total stats
-    const totalRevenue  = orders.reduce((s, o) => s + (o.pricing?.totalAmount || o.totalAmount || 0), 0);
-    const totalOrders   = orders.length;
-    const avgOrderValue = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
-    const delivered     = orders.filter(o => o.status === "delivered" || o.status === "completed").length;
-    const cancelled     = orders.filter(o => o.status === "cancelled").length;
+    const totalRevenue   = orders.reduce((s, o) => s + (o.pricing?.totalAmount || o.totalAmount || 0), 0);
+    const totalOrders    = orders.length;
+    const avgOrderValue  = totalOrders > 0 ? Math.round(totalRevenue / totalOrders) : 0;
+    const delivered      = orders.filter(o => o.status === "delivered" || o.status === "completed").length;
+    const cancelled      = orders.filter(o => o.status === "cancelled").length;
     const completionRate = totalOrders > 0 ? Math.round((delivered / totalOrders) * 100) : 0;
 
     res.json({
       success: true,
       data: {
-        period:         parseInt(period),
-        totalRevenue,
-        totalOrders,
-        avgOrderValue,
-        completionRate,
-        delivered,
-        cancelled,
-        dailyRevenue:   Object.values(dailyRevenue).sort((a,b) => a.date.localeCompare(b.date)),
+        period: parseInt(period),
+        totalRevenue, totalOrders, avgOrderValue, completionRate, delivered, cancelled,
+        dailyRevenue:    Object.values(dailyRevenue).sort((a, b) => a.date.localeCompare(b.date)),
         statusBreakdown: statusCount,
       },
     });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const getPeakHours = async (req, res) => {
@@ -144,23 +220,19 @@ const getPeakHours = async (req, res) => {
 
     const hourly = await Order.aggregate([
       { $match: { vendor: new mongoose.Types.ObjectId(vendorId), createdAt: { $gte: from } } },
-      { $group: {
-          _id:    { $hour: "$createdAt" },
-          orders: { $sum: 1 },
-          revenue:{ $sum: "$pricing.totalAmount" },
-        }
-      },
+      { $group: { _id: { $hour: "$createdAt" }, orders: { $sum: 1 }, revenue: { $sum: "$pricing.totalAmount" } } },
       { $sort: { _id: 1 } },
     ]);
 
-    // Fill all 24 hours
     const full = Array.from({ length: 24 }, (_, h) => {
       const found = hourly.find(x => x._id === h);
       return { hour: h, label: `${h}:00`, orders: found?.orders || 0, revenue: found?.revenue || 0 };
     });
 
     res.json({ success: true, data: full });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const getBestItems = async (req, res) => {
@@ -184,7 +256,9 @@ const getBestItems = async (req, res) => {
     ]);
 
     res.json({ success: true, data: best });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 // ============================================================
@@ -195,7 +269,9 @@ const getFeaturedItems = async (req, res) => {
   try {
     const items = await MenuItem.find({ vendor: req.user._id, isFeatured: true });
     res.json({ success: true, data: items });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const toggleFeatured = async (req, res) => {
@@ -205,7 +281,9 @@ const toggleFeatured = async (req, res) => {
     item.isFeatured = !item.isFeatured;
     await item.save();
     res.json({ success: true, data: item, message: `Item ${item.isFeatured ? "featured" : "unfeatured"}` });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 // ============================================================
@@ -216,9 +294,10 @@ const getOffers = async (req, res) => {
   try {
     const restaurant = await Restaurant.findOne({ owner: req.user._id });
     if (!restaurant) return res.json({ success: true, data: [] });
-    const offers = restaurant.specialOffers || [];
-    res.json({ success: true, data: offers });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+    res.json({ success: true, data: restaurant.specialOffers || [] });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const createOffer = async (req, res) => {
@@ -229,7 +308,8 @@ const createOffer = async (req, res) => {
 
     if (!restaurant.specialOffers) restaurant.specialOffers = [];
     restaurant.specialOffers.push({
-      title, description, discountPercent: Number(discountPercent) || 0,
+      title, description,
+      discountPercent: Number(discountPercent) || 0,
       validFrom: validFrom || new Date(),
       validTo:   validTo   || null,
       offerType: offerType || "general",
@@ -238,7 +318,9 @@ const createOffer = async (req, res) => {
     });
     await restaurant.save();
     res.status(201).json({ success: true, data: restaurant.specialOffers, message: "Offer created" });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const updateOffer = async (req, res) => {
@@ -250,17 +332,23 @@ const updateOffer = async (req, res) => {
     Object.assign(offer, req.body);
     await restaurant.save();
     res.json({ success: true, data: offer });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const deleteOffer = async (req, res) => {
   try {
     const restaurant = await Restaurant.findOne({ owner: req.user._id });
     if (!restaurant) return res.status(404).json({ message: "Restaurant not found" });
-    restaurant.specialOffers = restaurant.specialOffers?.filter(o => o._id.toString() !== req.params.id) || [];
+    restaurant.specialOffers = restaurant.specialOffers?.filter(
+      o => o._id.toString() !== req.params.id
+    ) || [];
     await restaurant.save();
     res.json({ success: true, message: "Offer deleted" });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 // ============================================================
@@ -271,18 +359,22 @@ const getMenuPlan = async (req, res) => {
   try {
     const restaurant = await Restaurant.findOne({ owner: req.user._id }).select("menuPlan");
     res.json({ success: true, data: restaurant?.menuPlan || {} });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const saveMenuPlan = async (req, res) => {
   try {
-    const { plan } = req.body; // { Monday: { lunch: [...itemIds], dinner: [...itemIds] }, ... }
+    const { plan } = req.body;
     const restaurant = await Restaurant.findOne({ owner: req.user._id });
     if (!restaurant) return res.status(404).json({ message: "Restaurant not found" });
     restaurant.menuPlan = plan;
     await restaurant.save();
     res.json({ success: true, data: restaurant.menuPlan, message: "Menu plan saved" });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 // ============================================================
@@ -300,47 +392,41 @@ const getTodayDeliveries = async (req, res) => {
       endDate:   { $gt: new Date() },
     }).populate("user", "name phone email");
 
-    // Attach delivery status for today (could be stored in a DailyDelivery model)
-    // For now we return the subs with a delivered flag
     const data = subs.map(s => ({
-      _id:        s._id,
-      user:       s.user,
-      mealType:   s.mealType,
-      lunchSlot:  s.lunchSlot,
-      dinnerSlot: s.dinnerSlot,
-      address:    s.address,
-      city:       s.city,
-      planType:   s.planType,
-      deliveredToday: s.deliveredToday || false,
-      deliveredSlots: s.deliveredSlots || [],
+      _id:            s._id,
+      user:           s.user,
+      mealType:       s.mealType,
+      lunchSlot:      s.lunchSlot,
+      dinnerSlot:     s.dinnerSlot,
+      address:        s.address,
+      city:           s.city,
+      planType:       s.planType,
+      deliveredToday: s.deliveredToday  || false,
+      deliveredSlots: s.deliveredSlots  || [],
     }));
 
     res.json({ success: true, data });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const markDelivered = async (req, res) => {
   try {
-    const { slot } = req.body; // "lunch" | "dinner"
+    const { slot } = req.body;
     const sub = await Subscription.findById(req.params.subId);
     if (!sub) return res.status(404).json({ message: "Subscription not found" });
 
     if (!sub.deliveredSlots) sub.deliveredSlots = [];
     const today = new Date().toISOString().split("T")[0];
     const key   = `${today}_${slot}`;
+    if (!sub.deliveredSlots.includes(key)) sub.deliveredSlots.push(key);
 
-    if (!sub.deliveredSlots.includes(key)) {
-      sub.deliveredSlots.push(key);
-    }
-
-    // Check if both slots delivered today
     const lunchDone  = sub.deliveredSlots.includes(`${today}_lunch`);
     const dinnerDone = sub.deliveredSlots.includes(`${today}_dinner`);
     sub.deliveredToday = lunchDone && dinnerDone;
-
     await sub.save();
 
-    // Notify customer
     try {
       await Notification.create({
         user:    sub.user,
@@ -352,7 +438,9 @@ const markDelivered = async (req, res) => {
     } catch {}
 
     res.json({ success: true, message: `${slot} marked as delivered`, data: sub });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
 const getSubscriberStats = async (req, res) => {
@@ -361,8 +449,8 @@ const getSubscriberStats = async (req, res) => {
     if (!restaurant) return res.json({ success: true, data: {} });
 
     const [active, paused, cancelled, total] = await Promise.all([
-      Subscription.countDocuments({ kitchenId: restaurant._id, status: "active" }),
-      Subscription.countDocuments({ kitchenId: restaurant._id, status: "paused" }),
+      Subscription.countDocuments({ kitchenId: restaurant._id, status: "active"    }),
+      Subscription.countDocuments({ kitchenId: restaurant._id, status: "paused"    }),
       Subscription.countDocuments({ kitchenId: restaurant._id, status: "cancelled" }),
       Subscription.countDocuments({ kitchenId: restaurant._id }),
     ]);
@@ -374,22 +462,16 @@ const getSubscriberStats = async (req, res) => {
 
     res.json({
       success: true,
-      data: {
-        active, paused, cancelled, total,
-        monthlyRevenue: revenue[0]?.total || 0,
-      },
+      data: { active, paused, cancelled, total, monthlyRevenue: revenue[0]?.total || 0 },
     });
-  } catch (e) { res.status(500).json({ message: e.message }); }
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
 };
 
-// ============================================================
-// GET ALL SUBSCRIPTIONS FOR THIS KITCHEN
-// ============================================================
 const getVendorSubscriptions = async (req, res) => {
   try {
     const restaurant = await Restaurant.findOne({ owner: req.user._id });
-
-    // Query by restaurantId OR vendorId — covers both storage patterns
     const query = restaurant
       ? { $or: [{ kitchenId: restaurant._id }, { kitchenId: req.user._id }, { vendor: req.user._id }] }
       : { $or: [{ kitchenId: req.user._id }, { vendor: req.user._id }] };
@@ -407,7 +489,7 @@ const getVendorSubscriptions = async (req, res) => {
 
 module.exports = {
   // Coupons
-  getCoupons, createCoupon, updateCoupon, deleteCoupon, toggleCoupon,
+  getCoupons, createCoupon, updateCoupon, deleteCoupon, toggleCoupon, acceptCoupon,
   // Analytics
   getAnalytics, getPeakHours, getBestItems,
   // Featured
@@ -418,6 +500,6 @@ module.exports = {
   getMenuPlan, saveMenuPlan,
   // Deliveries
   getTodayDeliveries, markDelivered, getSubscriberStats,
-  // Subscriptions list
+  // Subscriptions
   getVendorSubscriptions,
 };

@@ -1,5 +1,4 @@
-// src/vendor/components/Sidebar.jsx — UPDATED with all new nav items
-import { useNavigate } from "react-router-dom";
+// src/vendor/components/Sidebar.jsx — FIXED: static sidebar, correct mobile overlay
 import API from "../../services/axios";
 import {
   FaTachometerAlt, FaClipboardList, FaUtensils,
@@ -63,22 +62,15 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, activePage, isClo
     setSidebarOpen(false);
   };
 
-  // Determine active page for nested routes
   const isPageActive = (page) => {
     if (page === "menu-planner") return activePage === "menu-planner";
     return activePage === page;
   };
 
-  return (
-    <aside className={`
-      fixed md:static top-0 left-0 h-full w-64 shrink-0 z-50
-      bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col
-      transform transition-transform duration-300 ease-in-out
-      ${sidebarOpen ? "translate-x-0" : "-translate-x-full"} md:translate-x-0
-    `}>
-
+  const sidebarContent = (
+    <aside className="w-64 h-full bg-gradient-to-b from-gray-900 to-gray-800 text-white flex flex-col">
       {/* Logo */}
-      <div className="px-6 py-5 border-b border-white/10 flex items-center gap-3">
+      <div className="px-6 py-5 border-b border-white/10 flex items-center gap-3 shrink-0">
         <div className={`w-9 h-9 rounded-xl flex items-center justify-center font-black text-lg shadow-lg ${
           isCloudKitchen ? "bg-purple-500" : "bg-orange-500"
         }`}>
@@ -126,12 +118,36 @@ export default function Sidebar({ sidebarOpen, setSidebarOpen, activePage, isClo
       </nav>
 
       {/* Logout */}
-      <div className="px-3 py-4 border-t border-white/10">
+      <div className="px-3 py-4 border-t border-white/10 shrink-0">
         <button onClick={handleLogout}
           className="flex items-center justify-center gap-2 w-full px-4 py-2.5 rounded-xl bg-red-500/80 hover:bg-red-600 transition text-sm font-bold">
           <FaSignOutAlt className="text-xs" /> Logout
         </button>
       </div>
     </aside>
+  );
+
+  return (
+    <>
+      {/* ── DESKTOP: static, always visible ── */}
+      <div className="hidden md:flex h-full w-64 shrink-0">
+        {sidebarContent}
+      </div>
+
+      {/* ── MOBILE: slide-in drawer over content ── */}
+      {sidebarOpen && (
+        <div className="md:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setSidebarOpen(false)}
+          />
+          {/* Drawer */}
+          <div className="relative z-10 h-full w-64 flex-shrink-0">
+            {sidebarContent}
+          </div>
+        </div>
+      )}
+    </>
   );
 }

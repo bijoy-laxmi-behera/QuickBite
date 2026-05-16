@@ -1,221 +1,170 @@
-// src/vendor/pages/Coupons.jsx
+// src/vendor/pages/Coupons.jsx — REDESIGNED: shows admin-generated coupons, vendor can accept/reject
 import { useState, useEffect } from "react";
 import API from "../../services/axios";
-import { FaPlus, FaEdit, FaTrash, FaToggleOn, FaToggleOff, FaSpinner, FaTimes, FaTag } from "react-icons/fa";
+import { FaTag, FaSpinner, FaToggleOn, FaToggleOff, FaCheckCircle, FaTimesCircle, FaInfoCircle } from "react-icons/fa";
 
-const EMPTY = { code:"", discountType:"percentage", discountValue:"", minOrderAmount:"", maxDiscount:"", validTo:"", usageLimit:"", description:"" };
+// Status badge config
+const STATUS = {
+  active:   { label: "ACTIVE",    cls: "bg-green-100 text-green-700"  },
+  inactive: { label: "INACTIVE",  cls: "bg-gray-100  text-gray-500"   },
+  expired:  { label: "EXPIRED",   cls: "bg-red-100   text-red-600"    },
+  limit:    { label: "LIMIT HIT", cls: "bg-yellow-100 text-yellow-700"},
+};
 
-function CouponModal({ coupon, onClose, onSave }) {
-  const [form, setForm]   = useState(coupon ? { ...coupon } : EMPTY);
-  const [saving, setSaving] = useState(false);
-  const f = (k,v) => setForm(p=>({...p,[k]:v}));
-
-  const handleSubmit = async () => {
-    if (!form.code || !form.discountValue) { alert("Code and discount value required"); return; }
-    setSaving(true);
-    try {
-      if (coupon?._id) await API.put(`/vendor/coupons/${coupon._id}`, form);
-      else             await API.post("/vendor/coupons", form);
-      onSave();
-    } catch (e) { alert(e.response?.data?.message || "Save failed"); }
-    setSaving(false);
-  };
-
-  return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-4">
-      <div className="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl">
-        <div className="flex items-center justify-between p-5 border-b border-gray-100">
-          <h2 className="text-lg font-black text-gray-800">{coupon ? "Edit Coupon" : "Create Coupon"}</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl hover:bg-gray-100 text-gray-500"><FaTimes /></button>
-        </div>
-        <div className="p-5 space-y-4">
-          {/* Code */}
-          <div>
-            <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Coupon Code *</label>
-            <input value={form.code} onChange={e=>f("code",e.target.value.toUpperCase())}
-              placeholder="e.g. SAVE20"
-              className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm font-black uppercase focus:outline-none focus:border-orange-400 transition" />
-          </div>
-
-          {/* Type + Value */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Type</label>
-              <select value={form.discountType} onChange={e=>f("discountType",e.target.value)}
-                className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 transition bg-white">
-                <option value="percentage">% Percentage</option>
-                <option value="flat">₹ Flat</option>
-              </select>
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                Value ({form.discountType==="percentage"?"%":"₹"}) *
-              </label>
-              <input type="number" value={form.discountValue} onChange={e=>f("discountValue",e.target.value)}
-                placeholder={form.discountType==="percentage"?"20":"50"}
-                className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 transition" />
-            </div>
-          </div>
-
-          {/* Min order + Max discount */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Min Order (₹)</label>
-              <input type="number" value={form.minOrderAmount} onChange={e=>f("minOrderAmount",e.target.value)}
-                placeholder="199"
-                className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 transition" />
-            </div>
-            {form.discountType==="percentage" && (
-              <div>
-                <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Max Discount (₹)</label>
-                <input type="number" value={form.maxDiscount} onChange={e=>f("maxDiscount",e.target.value)}
-                  placeholder="100"
-                  className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 transition" />
-              </div>
-            )}
-          </div>
-
-          {/* Expiry + Usage limit */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Valid Until</label>
-              <input type="date" value={form.validTo?.split("T")[0]||""} onChange={e=>f("validTo",e.target.value)}
-                className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 transition" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Usage Limit</label>
-              <input type="number" value={form.usageLimit} onChange={e=>f("usageLimit",e.target.value)}
-                placeholder="100"
-                className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 transition" />
-            </div>
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Description</label>
-            <textarea rows={2} value={form.description} onChange={e=>f("description",e.target.value)}
-              placeholder="What is this coupon for?"
-              className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 transition resize-none" />
-          </div>
-
-          {/* Preview */}
-          {form.code && form.discountValue && (
-            <div className="bg-orange-50 border border-orange-200 border-dashed rounded-xl p-4 text-center">
-              <p className="text-xs text-gray-400 font-medium mb-1">Preview</p>
-              <p className="text-2xl font-black text-orange-500 tracking-widest">{form.code}</p>
-              <p className="text-sm text-gray-600 mt-1">
-                {form.discountType==="percentage"
-                  ? `${form.discountValue}% off${form.maxDiscount?` (max ₹${form.maxDiscount})`:""}${form.minOrderAmount?` on orders above ₹${form.minOrderAmount}`:""}`
-                  : `₹${form.discountValue} flat off${form.minOrderAmount?` on orders above ₹${form.minOrderAmount}`:""}`}
-              </p>
-            </div>
-          )}
-
-          <button onClick={handleSubmit} disabled={saving}
-            className="w-full py-3 bg-gradient-to-r from-orange-500 to-amber-400 text-white font-black rounded-xl transition disabled:opacity-50 flex items-center justify-center gap-2">
-            {saving && <FaSpinner className="animate-spin" />}
-            {coupon ? "Save Changes" : "Create Coupon"}
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+function getStatus(c) {
+  const expired    = c.validTo && new Date(c.validTo) < new Date();
+  const limitHit   = c.usageLimit && c.usedCount >= c.usageLimit;
+  if (expired)  return "expired";
+  if (limitHit) return "limit";
+  // vendorAccepted controls whether the vendor opted in
+  if (!c.vendorAccepted) return "inactive";
+  return "active";
 }
 
 export default function Coupons() {
   const [coupons, setCoupons] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal,   setModal]   = useState(null);
+  const [toggling, setToggling] = useState(null); // track which coupon is mid-toggle
 
   const fetchCoupons = async () => {
     try {
+      // This endpoint should return coupons created by admin, scoped to this vendor
       const { data } = await API.get("/vendor/coupons");
       setCoupons(data.data || []);
-    } catch {}
-    setLoading(false);
+    } catch (e) {
+      console.error("Coupons fetch error:", e);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => { fetchCoupons(); }, []);
 
-  const toggle = async (id) => {
+  // Toggle vendor opt-in/opt-out for an admin coupon
+  const toggleAcceptance = async (id, current) => {
+    setToggling(id);
     try {
-      await API.patch(`/vendor/coupons/${id}/toggle`);
-      fetchCoupons();
-    } catch {}
+      // PATCH /vendor/coupons/:id/accept  → { accepted: true/false }
+      await API.patch(`/vendor/coupons/${id}/accept`, { accepted: !current });
+      setCoupons(prev =>
+        prev.map(c => c._id === id ? { ...c, vendorAccepted: !current } : c)
+      );
+    } catch (e) {
+      console.error("Toggle error:", e);
+    } finally {
+      setToggling(null);
+    }
   };
 
-  const deleteCoupon = async (id) => {
-    if (!window.confirm("Delete this coupon?")) return;
-    try { await API.delete(`/vendor/coupons/${id}`); fetchCoupons(); } catch {}
-  };
+  const active   = coupons.filter(c => c.vendorAccepted && getStatus(c) === "active").length;
+  const pending  = coupons.filter(c => !c.vendorAccepted && getStatus(c) !== "expired" && getStatus(c) !== "limit").length;
 
-  const isExpired = (c) => c.validTo && new Date(c.validTo) < new Date();
-  const isLimitReached = (c) => c.usageLimit && c.usedCount >= c.usageLimit;
+  if (loading) {
+    return (
+      <div className="flex justify-center items-center py-24">
+        <FaSpinner className="animate-spin text-orange-500 text-3xl" />
+      </div>
+    );
+  }
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-5">
-      <div className="flex items-center justify-between">
+
+      {/* Header */}
+      <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl font-black text-gray-800">Coupons</h1>
-          <p className="text-gray-400 text-sm">{coupons.filter(c=>c.isActive).length} active coupons</p>
+          <h1 className="text-xl font-black text-gray-800">Admin Coupons</h1>
+          <p className="text-gray-400 text-sm mt-0.5">
+            Coupons created by QuickBite admin — toggle to opt in or out.
+          </p>
         </div>
-        <button onClick={() => setModal({})}
-          className="flex items-center gap-2 px-4 py-2.5 bg-orange-500 hover:bg-orange-600 text-white font-bold text-sm rounded-xl transition shadow-lg shadow-orange-200">
-          <FaPlus /> Create Coupon
-        </button>
+        <div className="flex gap-3 flex-shrink-0">
+          <div className="text-center px-4 py-2 bg-green-50 rounded-xl border border-green-100">
+            <p className="text-lg font-black text-green-600">{active}</p>
+            <p className="text-[10px] text-green-500 font-semibold uppercase">Active</p>
+          </div>
+          {pending > 0 && (
+            <div className="text-center px-4 py-2 bg-orange-50 rounded-xl border border-orange-100">
+              <p className="text-lg font-black text-orange-500">{pending}</p>
+              <p className="text-[10px] text-orange-400 font-semibold uppercase">Pending</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {loading ? (
-        <div className="flex justify-center py-16"><FaSpinner className="animate-spin text-orange-500 text-3xl" /></div>
-      ) : coupons.length === 0 ? (
+      {/* Info banner */}
+      <div className="flex items-start gap-3 bg-blue-50 border border-blue-100 rounded-2xl p-4">
+        <FaInfoCircle className="text-blue-400 mt-0.5 flex-shrink-0" />
+        <p className="text-xs text-blue-600 leading-relaxed">
+          These coupons are configured by the QuickBite admin. You can choose to participate by
+          toggling each one on. When active, customers at your restaurant can apply these
+          discount codes at checkout.
+        </p>
+      </div>
+
+      {/* Empty state */}
+      {coupons.length === 0 ? (
         <div className="text-center py-16 bg-white rounded-2xl border border-gray-100">
           <FaTag className="text-gray-200 text-5xl mx-auto mb-3" />
-          <p className="text-gray-400 font-medium">No coupons yet</p>
-          <button onClick={() => setModal({})} className="mt-4 px-5 py-2 bg-orange-500 text-white font-bold text-sm rounded-xl">
-            Create First Coupon
-          </button>
+          <p className="text-gray-500 font-semibold">No coupons available</p>
+          <p className="text-gray-400 text-sm mt-1">The admin hasn't created any coupons yet.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {coupons.map(c => {
-            const expired = isExpired(c);
-            const limitHit = isLimitReached(c);
-            const status = !c.isActive ? "inactive" : expired ? "expired" : limitHit ? "limit" : "active";
+            const status   = getStatus(c);
+            const s        = STATUS[status];
+            const accepted = !!c.vendorAccepted;
+            const canToggle = status !== "expired" && status !== "limit";
+            const isLoading = toggling === c._id;
+            const expired   = c.validTo && new Date(c.validTo) < new Date();
 
             return (
-              <div key={c._id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm ${
-                status==="active"?"border-gray-100":"border-gray-200 opacity-70"
+              <div key={c._id} className={`bg-white rounded-2xl border overflow-hidden shadow-sm transition-all ${
+                accepted && status === "active"
+                  ? "border-orange-200 shadow-orange-50"
+                  : "border-gray-100 opacity-80"
               }`}>
-                {/* Top stripe */}
-                <div className={`h-1.5 w-full ${status==="active"?"bg-gradient-to-r from-orange-400 to-yellow-400":"bg-gray-200"}`} />
 
-                <div className="p-4">
-                  <div className="flex items-start justify-between">
+                {/* Top accent */}
+                <div className={`h-1.5 w-full ${
+                  accepted && status === "active"
+                    ? "bg-gradient-to-r from-orange-400 to-yellow-400"
+                    : "bg-gray-100"
+                }`} />
+
+                <div className="p-4 space-y-3">
+                  {/* Code + status */}
+                  <div className="flex items-start justify-between gap-2">
                     <div>
                       <p className="text-xl font-black tracking-widest text-gray-800">{c.code}</p>
                       <p className="text-sm text-gray-500 mt-0.5">
-                        {c.discountType==="percentage"
-                          ? `${c.discountValue}% off${c.maxDiscount?` (max ₹${c.maxDiscount})`:""}`
+                        {c.discountType === "percentage"
+                          ? `${c.discountValue}% off${c.maxDiscount ? ` (max ₹${c.maxDiscount})` : ""}`
                           : `₹${c.discountValue} flat off`}
                       </p>
                     </div>
-                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-full ${
-                      status==="active"  ? "bg-green-100 text-green-700" :
-                      status==="expired" ? "bg-red-100 text-red-600" :
-                      status==="limit"   ? "bg-yellow-100 text-yellow-700" : "bg-gray-100 text-gray-500"
-                    }`}>
-                      {status==="active"?"ACTIVE":status==="expired"?"EXPIRED":status==="limit"?"LIMIT HIT":"INACTIVE"}
+                    <span className={`text-[10px] font-black px-2.5 py-1 rounded-full whitespace-nowrap ${s.cls}`}>
+                      {s.label}
                     </span>
                   </div>
 
-                  {c.description && <p className="text-xs text-gray-400 mt-2">{c.description}</p>}
+                  {/* Description */}
+                  {c.description && (
+                    <p className="text-xs text-gray-400 leading-relaxed">{c.description}</p>
+                  )}
 
-                  <div className="flex flex-wrap gap-2 mt-3">
+                  {/* Tags */}
+                  <div className="flex flex-wrap gap-1.5">
                     {c.minOrderAmount > 0 && (
-                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-full">Min ₹{c.minOrderAmount}</span>
+                      <span className="text-[10px] bg-gray-100 text-gray-500 px-2 py-1 rounded-full">
+                        Min ₹{c.minOrderAmount}
+                      </span>
                     )}
                     {c.validTo && (
-                      <span className={`text-[10px] px-2 py-1 rounded-full ${expired?"bg-red-100 text-red-500":"bg-gray-100 text-gray-500"}`}>
+                      <span className={`text-[10px] px-2 py-1 rounded-full ${
+                        expired ? "bg-red-100 text-red-500" : "bg-gray-100 text-gray-500"
+                      }`}>
                         Valid till {new Date(c.validTo).toLocaleDateString("en-IN")}
                       </span>
                     )}
@@ -224,37 +173,46 @@ export default function Coupons() {
                         {c.usedCount || 0}/{c.usageLimit} used
                       </span>
                     )}
+                    <span className="text-[10px] bg-purple-50 text-purple-500 px-2 py-1 rounded-full">
+                      By Admin
+                    </span>
                   </div>
 
-                  <div className="flex items-center gap-2 mt-4">
-                    <button onClick={() => toggle(c._id)} className="flex items-center gap-1.5 text-xs font-bold text-gray-500">
-                      {c.isActive
-                        ? <FaToggleOn  className="text-green-500 text-lg" />
-                        : <FaToggleOff className="text-gray-400 text-lg" />}
-                      {c.isActive?"Active":"Inactive"}
-                    </button>
-                    <div className="ml-auto flex gap-2">
-                      <button onClick={() => setModal(c)} className="p-2 rounded-lg border border-gray-200 hover:bg-blue-50 text-blue-500 transition">
-                        <FaEdit className="text-xs" />
-                      </button>
-                      <button onClick={() => deleteCoupon(c._id)} className="p-2 rounded-lg border border-gray-200 hover:bg-red-50 text-red-500 transition">
-                        <FaTrash className="text-xs" />
-                      </button>
+                  {/* Accept / Reject toggle */}
+                  <div className={`flex items-center justify-between pt-2 border-t border-gray-50 ${
+                    !canToggle ? "opacity-40 pointer-events-none" : ""
+                  }`}>
+                    <div className="flex items-center gap-2">
+                      {accepted
+                        ? <FaCheckCircle className="text-green-500 text-base" />
+                        : <FaTimesCircle className="text-gray-300 text-base" />}
+                      <span className={`text-xs font-bold ${accepted ? "text-green-600" : "text-gray-400"}`}>
+                        {accepted ? "Participating" : "Not participating"}
+                      </span>
                     </div>
+
+                    <button
+                      disabled={!canToggle || isLoading}
+                      onClick={() => toggleAcceptance(c._id, accepted)}
+                      className="flex items-center gap-1.5 text-xs font-bold transition disabled:opacity-40">
+                      {isLoading
+                        ? <FaSpinner className="animate-spin text-gray-400 text-lg" />
+                        : accepted
+                          ? <FaToggleOn  className="text-orange-500 text-2xl" />
+                          : <FaToggleOff className="text-gray-300 text-2xl" />}
+                    </button>
                   </div>
+
+                  {!canToggle && (
+                    <p className="text-[10px] text-gray-400 text-center">
+                      {expired ? "This coupon has expired" : "Usage limit reached"}
+                    </p>
+                  )}
                 </div>
               </div>
             );
           })}
         </div>
-      )}
-
-      {modal !== null && (
-        <CouponModal
-          coupon={modal?._id ? modal : null}
-          onClose={() => setModal(null)}
-          onSave={() => { setModal(null); fetchCoupons(); }}
-        />
       )}
     </div>
   );

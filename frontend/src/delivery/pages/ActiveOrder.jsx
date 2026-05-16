@@ -7,8 +7,11 @@ import {
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
+// ✅ covers both "on-the-way" and "on_the_way" spellings
+const PICKED_UP_STATUSES = ["picked_up", "on-the-way", "on_the_way"];
+
 const STEPS = [
-  { key: "accepted",   label: "Order Confirmed", desc: "Restaurant is preparing",   icon: CheckCircle2 },
+  { key: "accepted",   label: "Order Confirmed", desc: "Restaurant is preparing",    icon: CheckCircle2 },
   { key: "picked_up",  label: "Picked Up",        desc: "You've collected the order", icon: Package      },
   { key: "on-the-way", label: "On The Way",       desc: "Heading to customer",        icon: Bike         },
   { key: "delivered",  label: "Delivered",         desc: "Order handed to customer",   icon: MapPin       },
@@ -20,6 +23,7 @@ export default function ActiveOrder() {
   const [otpModal, setOtpModal] = useState(false);
   const [otp, setOtp]           = useState("");
   const [busy, setBusy]         = useState(false);
+  const [error, setError]       = useState("");
 
   const token = localStorage.getItem("token");
 
@@ -35,27 +39,59 @@ export default function ActiveOrder() {
   const stepIdx = STEPS.findIndex((s) => s.key === deliveryStatus);
   const current = stepIdx >= 0 ? stepIdx : 0;
   const isDelivered = deliveryStatus === "delivered";
+  const canVerifyOtp = PICKED_UP_STATUSES.includes(deliveryStatus);
 
   const markPickedUp = async () => {
     setBusy(true);
+    setError("");
     try {
-      await axios.patch(`${API}/delivery/orders/${order._id}/picked-up`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      await axios.patch(
+        `${API}/delivery/orders/${order._id}/picked-up`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setOrder((p) => ({ ...p, deliveryStatus: "picked_up" }));
     } catch (e) {
-      alert(e?.response?.data?.message || "Failed to update status");
+      setError(e?.response?.data?.message || "Failed to update status");
     } finally { setBusy(false); }
   };
 
   const verifyOtp = async () => {
+    if (otp.length !== 6) return;
     setBusy(true);
+    setError("");
     try {
-      await axios.post(`${API}/delivery/orders/${order._id}/otp-verify`, { otp }, { headers: { Authorization: `Bearer ${token}` } });
-      await axios.patch(`${API}/delivery/orders/${order._id}/delivered`, {}, { headers: { Authorization: `Bearer ${token}` } });
+      // Step 1: verify OTP
+      await axios.post(
+        `${API}/delivery/orders/${order._id}/otp-verify`,
+        { otp },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Step 2: mark delivered
+      await axios.patch(
+        `${API}/delivery/orders/${order._id}/delivered`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
       setOtpModal(false);
+      setOtp("");
       setOrder((p) => ({ ...p, deliveryStatus: "delivered", status: "delivered" }));
-    } catch {
-      alert("Invalid OTP or failed to deliver");
+    } catch (e) {
+      setError(e?.response?.data?.message || "Invalid OTP. Please try again.");
     } finally { setBusy(false); }
+  };
+
+  const resendOtp = async () => {
+    try {
+      await axios.post(
+        `${API}/delivery/orders/${order._id}/resend-otp`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      alert("OTP resent to customer's email!");
+    } catch {
+      alert("Failed to resend OTP");
+    }
   };
 
   if (loading) return (
@@ -96,6 +132,13 @@ export default function ActiveOrder() {
             {isDelivered ? "✓ Delivered" : "In Progress"}
           </span>
         </div>
+
+        {/* Error banner */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm text-red-600 font-medium">
+            ⚠️ {error}
+          </div>
+        )}
 
         {/* Customer */}
         <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
@@ -164,9 +207,10 @@ export default function ActiveOrder() {
                 {busy ? "Updating..." : "Mark as Picked Up"}
               </button>
             )}
-            {["picked_up", "on-the-way"].includes(deliveryStatus) && (
+            {/* ✅ Fixed: uses canVerifyOtp which covers all picked_up variants */}
+            {canVerifyOtp && (
               <button
-                onClick={() => setOtpModal(true)}
+                onClick={() => { setError(""); setOtpModal(true); }}
                 className="flex-1 py-3.5 bg-emerald-500 hover:bg-emerald-400 rounded-xl text-white font-bold flex items-center justify-center gap-2 transition-colors shadow-lg shadow-emerald-500/20"
               >
                 <ShieldCheck size={16} />
@@ -191,7 +235,6 @@ export default function ActiveOrder() {
 
       {/* Right: Progress Tracker */}
       <div className="lg:col-span-2 space-y-4">
-
         <div className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm">
           <h3 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-6">Progress</h3>
           <div className="space-y-0">
@@ -231,7 +274,7 @@ export default function ActiveOrder() {
                           </button>
                         )}
                         {step.key === "picked_up" && (
-                          <button onClick={() => setOtpModal(true)}
+                          <button onClick={() => { setError(""); setOtpModal(true); }}
                             className="text-xs bg-emerald-500 hover:bg-emerald-400 text-white px-3 py-1.5 rounded-lg font-semibold transition">
                             Verify OTP & Deliver →
                           </button>
@@ -274,19 +317,39 @@ export default function ActiveOrder() {
           <div className="bg-white border border-gray-200 rounded-2xl p-6 w-full max-w-sm space-y-5 shadow-2xl">
             <div className="flex items-center justify-between">
               <h3 className="text-base font-black text-gray-900">Enter OTP</h3>
-              <button onClick={() => setOtpModal(false)} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
+              <button onClick={() => { setOtpModal(false); setOtp(""); setError(""); }} className="text-gray-400 hover:text-gray-700 text-lg">✕</button>
             </div>
             <p className="text-sm text-gray-500">Ask the customer for their 6-digit delivery code.</p>
+
+            {/* Error inside modal */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl px-3 py-2 text-xs text-red-600 font-medium">
+                ⚠️ {error}
+              </div>
+            )}
+
             <input
               type="number"
               value={otp}
-              onChange={(e) => setOtp(e.target.value)}
+              onChange={(e) => { setOtp(e.target.value.slice(0, 6)); setError(""); }}
               placeholder="• • • • • •"
               maxLength={6}
               className="w-full bg-gray-50 border border-gray-300 rounded-xl px-4 py-4 text-center text-2xl font-black text-gray-900 tracking-[0.5em] focus:outline-none focus:border-orange-500 transition-colors"
             />
+
+            {/* Resend OTP */}
+            <button
+              onClick={resendOtp}
+              className="w-full text-xs text-blue-500 hover:text-blue-700 text-center transition-colors"
+            >
+              Customer didn't get OTP? Resend →
+            </button>
+
             <div className="flex gap-3">
-              <button onClick={() => setOtpModal(false)} className="flex-1 py-3 bg-gray-100 rounded-xl text-gray-500 font-semibold text-sm hover:bg-gray-200 transition-colors">
+              <button
+                onClick={() => { setOtpModal(false); setOtp(""); setError(""); }}
+                className="flex-1 py-3 bg-gray-100 rounded-xl text-gray-500 font-semibold text-sm hover:bg-gray-200 transition-colors"
+              >
                 Cancel
               </button>
               <button
