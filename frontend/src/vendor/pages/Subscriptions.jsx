@@ -11,25 +11,20 @@ export default function Subscriptions() {
   const [selected,setSelected]= useState(null);
 
   useEffect(() => {
-    // Fetch all subscriptions for this kitchen from customer subscription model
-    // We use the admin/vendor endpoint if available, otherwise customer endpoint with kitchen filter
+    // Fetch subscriptions for this kitchen via vendor endpoint
     const fetchSubs = async () => {
       try {
-        // Try vendor-specific endpoint first
-        let data;
-        try {
-          const res = await API.get("/vendor/subscriptions");
-          data = res.data.data || [];
-        } catch {
-          // Fallback: get from customer subscriptions
-          const res = await API.get("/customer/subscription/all");
-          data = res.data.data || [];
-        }
+        const res = await API.get("/vendor/subscriptions");
+        const data = res.data?.data || [];
         setSubs(Array.isArray(data) ? data : []);
-      } catch { setSubs([]); }
-      setLoading(false);
+      } catch (err) {
+        console.error("Subscriptions fetch error:", err?.response?.data || err.message);
+        setSubs([]);
+      } finally {
+        setLoading(false);
+      }
     };
-    fetchSubs();
+    fetchSubs(); // ← was missing!
   }, []);
 
   const filtered = subs.filter(s => {

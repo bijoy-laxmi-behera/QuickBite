@@ -37,11 +37,14 @@ export default function SubscriptionCheckout() {
   // ── Fetch cloud kitchens ───────────────────────────────────────────────────
   useEffect(() => {
     const fetchKitchens = async () => {
-      try {
-        const { data } = await API.get("/customer/restaurants?type=Cloud Kitchen");
-        const list = data.data || data.restaurants || [];
-        // If no cloud kitchens tagged, show all restaurants as fallback
-        setKitchens(list.length ? list : (await API.get("/customer/restaurants")).data.data || []);
+  try {
+    const { data } = await API.get("/customer/restaurants");
+    const list = data.data || data.restaurants || [];
+    // ✅ Only Cloud Kitchens — never show regular restaurants
+    const cloudKitchens = list.filter(r =>
+      (r.type || "").toLowerCase().includes("cloud")
+    );
+    setKitchens(cloudKitchens);
       } catch {
         setKitchens([]);
       } finally {

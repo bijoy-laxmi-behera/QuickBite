@@ -19,15 +19,9 @@ export default function DeliverySchedule() {
   useEffect(() => {
     const fetchSubs = async () => {
       try {
-        let data = [];
-        try {
-          const { data: d } = await API.get("/vendor/subscriptions");
-          data = d.data || [];
-        } catch {
-          const { data: d } = await API.get("/customer/subscription/all");
-          data = d.data || [];
-        }
-        setSubs(Array.isArray(data) ? data.filter(s => s.status === "active") : []);
+        const { data } = await API.get("/vendor/subscriptions");
+        const list = data.data || [];
+        setSubs(Array.isArray(list) ? list.filter(s => s.status === "active") : []);
       } catch { setSubs([]); }
       setLoading(false);
     };
