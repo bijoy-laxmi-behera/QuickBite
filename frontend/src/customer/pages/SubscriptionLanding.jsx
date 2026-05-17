@@ -1,7 +1,8 @@
 // src/customer/pages/SubscriptionLanding.jsx
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaCrown, FaFire, FaCheck, FaStar } from "react-icons/fa";
+import { FaCrown, FaFire, FaCheck, FaStar, FaSpinner } from "react-icons/fa";
+import API from "../../services/axios";
 
 const PLANS = {
   weekly: {
@@ -38,10 +39,46 @@ const TESTIMONIALS = [
 ];
 
 export default function SubscriptionLanding() {
-  const navigate   = useNavigate();
-  const [plan, setPlan]       = useState("monthly");
-  const [visible, setVisible] = useState(false);
-  useEffect(() => { setTimeout(() => setVisible(true), 80); }, []);
+  const navigate = useNavigate();
+  const [plan, setPlan]         = useState("monthly");
+  const [visible, setVisible]   = useState(false);
+  // ── FIX 1: Check if user already has an active subscription ──
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    const checkExistingSubscription = async () => {
+      // Quick localStorage check first (avoids flicker)
+      if (localStorage.getItem("hasSubscription") === "true") {
+        navigate("/customer/subscription-dashboard", { replace: true });
+        return;
+      }
+      try {
+        const { data } = await API.get("/customer/subscription/status");
+        if (data.success && data.data?.active) {
+          // User is already subscribed — send them to their dashboard
+          localStorage.setItem("hasSubscription", "true");
+          navigate("/customer/subscription-dashboard", { replace: true });
+          return;
+        }
+      } catch {
+        // API failed — fall through and show landing page
+      }
+      setChecking(false);
+      setTimeout(() => setVisible(true), 80);
+    };
+
+    checkExistingSubscription();
+  }, [navigate]);
+
+  // Show spinner while checking subscription status
+  if (checking) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen gap-3">
+        <FaSpinner className="animate-spin text-orange-500 text-3xl" />
+        <p className="text-gray-400 text-sm">Checking your subscription…</p>
+      </div>
+    );
+  }
 
   const current = PLANS[plan];
 
