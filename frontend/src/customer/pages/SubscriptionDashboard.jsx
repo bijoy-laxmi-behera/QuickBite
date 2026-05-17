@@ -20,12 +20,13 @@ function InfoRow({ icon, label, value, valueClass = "text-gray-700" }) {
   );
 }
 
+// ── Subscription Menu Component ───────────────────────────────────────────────
 function SubscriptionMenu({ menu, menuLoading, mealType }) {
   const [slot, setSlot] = useState("lunch");
   const today = new Date().toLocaleDateString("en-US", { weekday: "long" });
 
   const slotItems = menu.filter(item => {
-    const itemSlot  = item.mealSlot || "lunch";
+    const itemSlot = item.mealSlot || "lunch";
     const matchSlot = itemSlot === slot || itemSlot === "both";
     const matchMeal = mealType === "non-veg" || item.isveg !== false;
     const matchDay  = !item.dayOfWeek || item.dayOfWeek === "daily" || item.dayOfWeek === today;
@@ -34,6 +35,7 @@ function SubscriptionMenu({ menu, menuLoading, mealType }) {
 
   return (
     <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* Header */}
       <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
         <div>
           <h3 className="text-sm font-black text-gray-800">Today's Menu</h3>
@@ -48,6 +50,7 @@ function SubscriptionMenu({ menu, menuLoading, mealType }) {
         )}
       </div>
 
+      {/* Slot tabs */}
       {menu.length > 0 && (
         <div className="flex border-b border-gray-50">
           {[
@@ -67,6 +70,7 @@ function SubscriptionMenu({ menu, menuLoading, mealType }) {
         </div>
       )}
 
+      {/* Info bar */}
       {menu.length > 0 && (
         <div className={`px-5 py-2 text-xs font-medium flex items-center gap-2 ${
           slot === "lunch" ? "bg-orange-50 text-orange-600" : "bg-blue-50 text-blue-600"
@@ -76,6 +80,7 @@ function SubscriptionMenu({ menu, menuLoading, mealType }) {
         </div>
       )}
 
+      {/* Items */}
       {menuLoading ? (
         <div className="flex items-center justify-center py-10 gap-2">
           <FaSpinner className="animate-spin text-orange-500" />
@@ -84,7 +89,9 @@ function SubscriptionMenu({ menu, menuLoading, mealType }) {
       ) : slotItems.length === 0 ? (
         <div className="text-center py-10">
           <span className="text-3xl">{slot === "lunch" ? "🌤️" : "🌙"}</span>
-          <p className="text-gray-400 text-sm font-medium mt-2">No {slot} items for today</p>
+          <p className="text-gray-400 text-sm font-medium mt-2">
+            No {slot} items for today
+          </p>
           <p className="text-gray-300 text-xs mt-1">Check back later or switch slots</p>
         </div>
       ) : (
@@ -105,11 +112,13 @@ function SubscriptionMenu({ menu, menuLoading, mealType }) {
                   </span>
                   <h4 className="text-sm font-bold text-gray-800 truncate">{item.name}</h4>
                 </div>
-                {item.dayOfWeek && item.dayOfWeek !== "daily" && (
-                  <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-semibold mt-1 inline-block">
-                    {item.dayOfWeek} special
-                  </span>
-                )}
+                <div className="flex gap-1.5 mt-1 flex-wrap">
+                  {item.dayOfWeek && item.dayOfWeek !== "daily" && (
+                    <span className="text-[10px] bg-purple-100 text-purple-600 px-2 py-0.5 rounded-full font-semibold">
+                      {item.dayOfWeek} special
+                    </span>
+                  )}
+                </div>
                 {item.description && (
                   <p className="text-xs text-gray-400 mt-1 line-clamp-2">{item.description}</p>
                 )}
@@ -122,47 +131,50 @@ function SubscriptionMenu({ menu, menuLoading, mealType }) {
   );
 }
 
+// ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function SubscriptionDashboard() {
   const navigate = useNavigate();
-  const [sub,         setSub]         = useState(null);
-  const [kitchen,     setKitchen]     = useState(null);
-  const [menu,        setMenu]        = useState([]);
-  const [loading,     setLoading]     = useState(true);
-  const [menuLoading, setMenuLoading] = useState(false);
-  const [cancelling,  setCancelling]  = useState(false);
-  const [pausing,     setPausing]     = useState(false);
+  const [sub,        setSub]        = useState(null);
+  const [kitchen,    setKitchen]    = useState(null);
+  const [menu,       setMenu]       = useState([]);
+  const [loading,    setLoading]    = useState(true);
+  const [menuLoading,setMenuLoading]= useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [pausing,    setPausing]    = useState(false);
 
   useEffect(() => {
     const load = async () => {
       try {
+        // 1. Fetch subscription status
         const { data } = await API.get("/customer/subscription/status");
-
-        // ── FIX 2: Only set sub when truly active/paused ──
-        if (data.success && data.data?.active) {
+        if (data.success && data.data) {
           setSub(data.data);
 
+          // 2. Fetch kitchen details
           const kitchenId = data.data.kitchenId?._id || data.data.kitchenId;
           if (kitchenId) {
             try {
               const { data: kData } = await API.get(`/customer/restaurants/${kitchenId}`);
               setKitchen(kData.data || kData);
             } catch {
+              // Try sessionStorage fallback
               try {
                 const k = JSON.parse(sessionStorage.getItem("subKitchen") || "null");
                 if (k) setKitchen(k);
               } catch {}
             }
 
+            // 3. Fetch menu
             setMenuLoading(true);
             try {
               const { data: mData } = await API.get(`/customer/restaurants/${kitchenId}/menu`);
               const raw = mData.data || mData.items || mData || [];
-              setMenu(Array.isArray(raw) ? raw : Object.values(raw).flat());
+              const items = Array.isArray(raw) ? raw : Object.values(raw).flat();
+              setMenu(items);
             } catch { setMenu([]); }
             setMenuLoading(false);
           }
         }
-        // If data.data.active === false → sub stays null → shows "No Active Subscription"
       } catch {}
       setLoading(false);
     };
@@ -172,23 +184,16 @@ export default function SubscriptionDashboard() {
   // Fallbacks from sessionStorage
   let sessionDetails = null;
   try { sessionDetails = JSON.parse(sessionStorage.getItem("subDetails") || "null"); } catch {}
-
-  const plan       = sub?.planType   || sessionDetails?.plan     || "weekly";
+  const plan       = sub?.planType   || sessionDetails?.plan    || "weekly";
   const mealType   = sub?.mealType   || sessionDetails?.mealType || "veg";
   const lunchSlot  = sub?.lunchSlot  || sessionDetails?.lunchSlot  || "—";
   const dinnerSlot = sub?.dinnerSlot || sessionDetails?.dinnerSlot || "—";
-  const price      = sub?.price      || sessionDetails?.price    || (plan === "weekly" ? 699 : 2499);
-  const address    = sub?.address    || sessionDetails?.address  || "";
+  const price      = sub?.price      || sessionDetails?.price   || (plan === "weekly" ? 699 : 2499);
+  const address    = sub?.address    || sessionDetails?.address || "";
   const planLabel  = plan === "weekly" ? "Weekly" : "Monthly";
-  const daysLeft   = sub?.endDate
-    ? Math.max(0, Math.ceil((new Date(sub.endDate) - new Date()) / 86400000))
-    : (plan === "weekly" ? 7 : 30);
-  const startDate  = sub?.startDate
-    ? new Date(sub.startDate).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" })
-    : "Today";
-  const endDate    = sub?.endDate
-    ? new Date(sub.endDate).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" })
-    : "—";
+  const daysLeft   = sub?.endDate ? Math.max(0, Math.ceil((new Date(sub.endDate) - new Date()) / 86400000)) : (plan === "weekly" ? 7 : 30);
+  const startDate  = sub?.startDate ? new Date(sub.startDate).toLocaleDateString("en-IN", { day:"2-digit", month:"short", year:"numeric" }) : "Today";
+  const endDate    = sub?.endDate   ? new Date(sub.endDate).toLocaleDateString("en-IN",   { day:"2-digit", month:"short", year:"numeric" }) : "—";
   const progress   = sub?.endDate && sub?.startDate
     ? Math.max(5, Math.min(100, 100 - (daysLeft / (plan === "weekly" ? 7 : 30)) * 100))
     : 10;
@@ -240,7 +245,6 @@ export default function SubscriptionDashboard() {
     setPausing(false);
   };
 
-  // ── Loading state ──
   if (loading) return (
     <div className="flex flex-col items-center justify-center min-h-screen gap-3">
       <FaSpinner className="animate-spin text-orange-500 text-3xl" />
@@ -248,7 +252,6 @@ export default function SubscriptionDashboard() {
     </div>
   );
 
-  // ── No active subscription (sub is null AND no session fallback) ──
   if (!sub && !sessionDetails) return (
     <div className="flex flex-col items-center justify-center min-h-[70vh] text-center px-6">
       <MdRestaurant className="text-5xl text-gray-300 mb-4" />
