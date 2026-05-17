@@ -26,6 +26,35 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
 }
 function deg2rad(deg) { return deg * (Math.PI / 180); }
 
+// ============ CRITICAL FIX: vendor/restaurant extraction ============
+// menuItem.vendor  = User ObjectId (the owner)  → stored in Order.vendor
+// menuItem.restaurant = Restaurant ObjectId      → stored in Order.restaurant
+//
+// Problem: after .populate("cart.items.menuItem"), these are sub-documents or
+// plain ObjectIds depending on schema. We must handle both cases and also
+// fall back to a Restaurant lookup by owner if menuItem.restaurant is missing.
+async function extractVendorAndRestaurant(menuItem) {
+  if (!menuItem) return { vendorId: null, restaurantId: null };
+
+  // vendorId: the User _id of the vendor/owner
+  const vendorId = menuItem.vendor?._id || menuItem.vendor || null;
+
+  // restaurantId: prefer the direct field, but fall back to DB lookup by owner
+  let restaurantId = menuItem.restaurant?._id || menuItem.restaurant || null;
+
+  if (!restaurantId && vendorId) {
+    // Fall back: look up the Restaurant document whose owner === vendorId
+    try {
+      const restaurant = await Restaurant.findOne({ owner: vendorId }).select("_id");
+      if (restaurant) restaurantId = restaurant._id;
+    } catch (e) {
+      console.error("Restaurant lookup fallback error:", e.message);
+    }
+  }
+
+  return { vendorId, restaurantId };
+}
+
 // ============ RESTAURANT CONTROLLERS ============
 const getRestaurants = async (req, res) => {
   try {
@@ -419,18 +448,19 @@ const removeCoupon = async (req, res) => {
 
 // ============ ORDER CONTROLLERS ============
 
-// ✅ FIX: helper to extract vendorId (User ObjectId) and restaurantId (Restaurant ObjectId)
-// from a populated menuItem so both Order fields are set correctly.
-function extractVendorAndRestaurant(menuItem) {
-  const vendorId     = menuItem?.vendor      || null; // User _id  → Order.vendor
-  const restaurantId = menuItem?.restaurant  || null; // Restaurant _id → Order.restaurant
-  return { vendorId, restaurantId };
-}
-
 const placeOrder = async (req, res) => {
   try {
     const { addressId, paymentMethod = "cod", customerLocation, couponCode, addressText, city, pincode, landmark } = req.body;
-    const user = await User.findById(req.user.id).populate("cart.items.menuItem");
+
+    // ✅ FIX: populate both vendor and restaurant fields on menu items
+    const user = await User.findById(req.user.id).populate({
+      path: "cart.items.menuItem",
+      populate: [
+        { path: "vendor",     select: "_id name" },
+        { path: "restaurant", select: "_id name owner" },
+      ],
+    });
+
     if (!user.cart.items.length) return res.status(400).json({ success: false, message: "Cart is empty" });
 
     let deliveryAddress = addressId ? user.addresses.id(addressId) : user.addresses.find(addr => addr.isDefault);
@@ -450,8 +480,23 @@ const placeOrder = async (req, res) => {
     const tax          = Math.round(subtotal * 0.05);
     const totalAmount  = subtotal + deliveryFee + platformFee + tax;
 
-    // ✅ FIX: correctly separate vendor (User _id) from restaurant (Restaurant _id)
-    const { vendorId, restaurantId } = extractVendorAndRestaurant(user.cart.items[0]?.menuItem);
+    // ✅ FIX: use the async helper with DB fallback
+    const { vendorId, restaurantId } = await extractVendorAndRestaurant(user.cart.items[0]?.menuItem);
+
+   // ✅ FIX: if vendorId still null, try looking up restaurant by menuItem's restaurant field directly
+let finalVendorId = vendorId;
+if (!finalVendorId && restaurantId) {
+  const rest = await Restaurant.findById(restaurantId).select("owner");
+  if (rest?.owner) finalVendorId = rest.owner;
+}
+if (!finalVendorId) {
+  console.error("PLACE ORDER: vendorId is null. menuItem:", 
+    JSON.stringify(user.cart.items[0]?.menuItem, null, 2));
+  return res.status(400).json({ 
+    success: false, 
+    message: "Could not determine restaurant. Please try again." 
+  });
+}
 
     const otp   = Math.floor(100000 + Math.random() * 900000).toString();
     const items = user.cart.items.map(item => ({
@@ -485,13 +530,38 @@ const placeOrder = async (req, res) => {
       otp,
     });
 
+    // ✅ Notify the vendor via socket if available
+    try {
+      const io = req.app.get("io");
+      if (io) {
+        io.to(vendorId.toString()).emit("newOrder", {
+          orderId: order._id,
+          message: `New order #${order.orderId} received!`,
+        });
+      }
+    } catch (socketErr) {
+      console.error("Socket notify error:", socketErr.message);
+    }
+
+    // ✅ Create vendor notification in DB
+    try {
+      await Notification.create({
+        vendor:  vendorId,
+        title:   "New Order 🍔",
+        message: `Order #${order.orderId} received from ${user.name || "a customer"}.`,
+        type:    "order",
+        isRead:  false,
+      });
+    } catch (notifErr) {
+      console.error("Notification create error:", notifErr.message);
+    }
+
     user.cart.items = []; user.cart.coupon = null; user.cart.discount = 0;
     await user.save();
 
     try {
-      const customer      = await User.findById(req.user.id);
-      const otpEmailHtml  = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;"><h2>Order Confirmed! 🎉</h2><p>Hey <b>${customer.name || "Customer"}</b>, your order is being prepared.</p><p><strong>Order ID:</strong> ${order.orderId}</p><p><strong>Total:</strong> ₹${totalAmount}</p><div style="background:#fff3cd;padding:20px;border-radius:10px;text-align:center;"><p><strong>Delivery OTP</strong></p><h1 style="color:#ff512f;letter-spacing:8px;">${otp}</h1><p>Share this with your delivery partner.</p></div></div>`;
-      await sendEmail(customer.email, `Order Confirmation - #${order.orderId}`, otpEmailHtml);
+      const otpEmailHtml = `<div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;"><h2>Order Confirmed! 🎉</h2><p>Hey <b>${user.name || "Customer"}</b>, your order is being prepared.</p><p><strong>Order ID:</strong> ${order.orderId}</p><p><strong>Total:</strong> ₹${totalAmount}</p><div style="background:#fff3cd;padding:20px;border-radius:10px;text-align:center;"><p><strong>Delivery OTP</strong></p><h1 style="color:#ff512f;letter-spacing:8px;">${otp}</h1><p>Share this with your delivery partner.</p></div></div>`;
+      await sendEmail(user.email, `Order Confirmation - #${order.orderId}`, otpEmailHtml);
     } catch (emailError) { console.error("Failed to send OTP email:", emailError.message); }
 
     res.status(201).json({ success: true, message: "Order placed successfully. OTP sent to your email.", data: order });
@@ -516,7 +586,7 @@ const getOrderById = async (req, res) => {
       .populate("items.menuItem", "name price image isveg")
       .populate("user",           "name email phone")
       .populate("vendor",         "name logo address phone cuisine")
-      .populate("deliveryPartner","name phone avatar"); // ✅ fixed field name
+      .populate("deliveryPartner","name phone avatar");
     if (!order) return res.status(404).json({ success: false, message: "Order not found" });
     if (order.user._id.toString() !== req.user.id && req.user.role !== "admin")
       return res.status(403).json({ success: false, message: "Unauthorized" });
@@ -524,11 +594,10 @@ const getOrderById = async (req, res) => {
   } catch (error) { res.status(500).json({ success: false, message: error.message }); }
 };
 
-// ✅ FIX: removed stray code that was pasted into the function signature
 const trackOrder = async (req, res) => {
   try {
     const order = await Order.findById(req.params.id)
-      .populate("deliveryPartner", "name phone avatar") // ✅ fixed field name
+      .populate("deliveryPartner", "name phone avatar")
       .populate("vendor",          "name address phone");
     if (!order) return res.status(404).json({ success: false, message: "Order not found" });
     if (order.user.toString() !== req.user.id && req.user.role !== "admin")
@@ -669,8 +738,17 @@ const verifyAndPlaceOrder = async (req, res) => {
     if (expectedSig !== razorpaySignature)
       return res.status(400).json({ success: false, message: "Payment verification failed. Invalid signature." });
 
-    // 2. Build order
-    const user = await User.findById(req.user.id).populate("cart.items.menuItem");
+    // 2. Build order — ✅ FIX: deep-populate vendor + restaurant on menu items
+    const user = await User.findById(req.user.id).populate({
+  path: "cart.items.menuItem",
+  populate: [
+    { path: "vendor",     select: "_id name" },
+    { path: "restaurant", select: "_id name owner" },
+  ],
+});
+
+// ✅ ADD THIS TEMPORARILY
+console.log("CART ITEM 0 menuItem:", JSON.stringify(user.cart.items[0]?.menuItem, null, 2));
     if (!user.cart.items.length)
       return res.status(400).json({ success: false, message: "Cart is empty" });
 
@@ -693,15 +771,19 @@ const verifyAndPlaceOrder = async (req, res) => {
     const tax         = Math.round(subtotal * 0.05);
     const totalAmount = subtotal + deliveryFee + platformFee + tax;
 
-    // ✅ FIX: correctly separate vendor (User _id) from restaurant (Restaurant _id)
-    const { vendorId, restaurantId } = extractVendorAndRestaurant(user.cart.items[0]?.menuItem);
+    // ✅ FIX: async extraction with DB fallback
+    const { vendorId, restaurantId } = await extractVendorAndRestaurant(user.cart.items[0]?.menuItem);
+
+    if (!vendorId) {
+      return res.status(400).json({ success: false, message: "Could not determine restaurant for this order." });
+    }
 
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
 
     const order = await Order.create({
       user:       user._id,
-      vendor:     vendorId,      // ✅ User ObjectId (owner)
-      restaurant: restaurantId,  // ✅ Restaurant ObjectId
+      vendor:     vendorId,
+      restaurant: restaurantId,
       items: user.cart.items.map(item => ({
         menuItem:      item.menuItem._id,
         name:          item.menuItem.name,
@@ -730,6 +812,13 @@ const verifyAndPlaceOrder = async (req, res) => {
       customerLocation:   customerLocation || null,
       otp,
     });
+
+    // ✅ Notify vendor
+    try {
+      const io = req.app.get("io");
+      if (io) io.to(vendorId.toString()).emit("newOrder", { orderId: order._id, message: `New order #${order.orderId} received!` });
+      await Notification.create({ vendor: vendorId, title: "New Order 🍔", message: `Order #${order.orderId} received from ${user.name || "a customer"}.`, type: "order", isRead: false });
+    } catch (e) { console.error("Vendor notify error:", e.message); }
 
     // 3. Record transaction
     await Transaction.create({

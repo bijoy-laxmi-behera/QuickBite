@@ -28,7 +28,7 @@ const RATING_LABELS = { 1: "Terrible 😤", 2: "Poor 😕", 3: "Okay 😐", 4: "
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const normalizeStatus = (s) => s?.toLowerCase().replace(/ /g, "_").replace(/-/g, "_") || "pending";
 const getStatusCfg    = (s) => STATUS_CONFIG[normalizeStatus(s)] || STATUS_CONFIG[s?.toLowerCase()] || STATUS_CONFIG.pending;
-const isLiveStatus    = (s) => ["confirmed","preparing","on-the-way","on_the_way","out_for_delivery"].includes(normalizeStatus(s));
+const isLiveStatus = (s) => ["pending","confirmed","preparing","on-the-way","on_the_way","out_for_delivery"].includes(normalizeStatus(s));
 
 function formatDate(dateString) {
   const d = new Date(dateString), now = new Date();
@@ -149,7 +149,7 @@ function Orders({ setPage }) {
   const [socketConnected,setSocketConnected]= useState(false);
 
   // Review state
-  const [reviewModal,      setReviewModal]      = useState(null); // { order, isEditing, existing }
+  const [reviewModal,      setReviewModal]      = useState(null);
   const [submittingReview, setSubmittingReview] = useState(false);
 
   const socketRef = useRef(null);
@@ -208,7 +208,6 @@ function Orders({ setPage }) {
     const onStatusUpdate = (data) => {
       setOrders(prev => prev.map(o => {
         if (o.id !== data.orderId) return o;
-        // Toast notification
         const msgs = {
           confirmed:        "✅ Order confirmed!",
           preparing:        "🍳 Restaurant is preparing your food!",
@@ -238,7 +237,16 @@ function Orders({ setPage }) {
   }, []);
 
   // ── Actions ───────────────────────────────────────────────────────────────
-  const handleCancel = async (orderId) => {
+
+  // ✅ NEW: Navigate to order-success page on card click
+  const handleOrderClick = (order) => {
+    localStorage.setItem("lastOrderId",    order.id);
+    localStorage.setItem("trackingOrderId",order.id);
+    navigate("/customer/order-success");
+  };
+
+  const handleCancel = async (e, orderId) => {
+    e.stopPropagation(); // prevent card click
     if (!window.confirm("Cancel this order?")) return;
     setCancellingId(orderId);
     try {
@@ -253,7 +261,8 @@ function Orders({ setPage }) {
     }
   };
 
-  const handleReorder = async (orderId) => {
+  const handleReorder = async (e, orderId) => {
+    e.stopPropagation(); // prevent card click
     setReorderId(orderId);
     try {
       const res = await API.post(`/customer/me/orders/${orderId}/reorder`);
@@ -268,12 +277,14 @@ function Orders({ setPage }) {
     }
   };
 
-  const handleTrack = (orderId) => {
+  const handleTrack = (e, orderId) => {
+    e.stopPropagation(); // prevent card click
     navigate(`/customer/order-tracking/${orderId}`);
   };
 
   // ── Review ────────────────────────────────────────────────────────────────
-  const openReview = async (order) => {
+  const openReview = async (e, order) => {
+    e.stopPropagation(); // prevent card click
     let existing = null;
     try {
       const res = await API.get("/customer/me/reviews");
@@ -421,16 +432,18 @@ function Orders({ setPage }) {
         {/* ── Order Cards ──────────────────────────────────────────────────── */}
         <div className="space-y-4">
           {filteredOrders.map((order) => {
-            const live         = isLiveStatus(order.status);
-            const isCancellable= ["pending","confirmed","preparing"].includes(normalizeStatus(order.status));
-            const isTrackable  = ["confirmed","preparing","on-the-way","on_the_way","out_for_delivery"].includes(normalizeStatus(order.status));
-            const canReview    = normalizeStatus(order.status) === "delivered" && !order.review;
-            const hasReview    = !!order.review;
+            const live          = isLiveStatus(order.status);
+            const isCancellable = ["pending","confirmed","preparing"].includes(normalizeStatus(order.status));
+            const isTrackable   = ["confirmed","preparing","on-the-way","on_the_way","out_for_delivery"].includes(normalizeStatus(order.status));
+            const canReview     = normalizeStatus(order.status) === "delivered" && !order.review;
+            const hasReview     = !!order.review;
 
             return (
               <div
                 key={order.id}
-                className={`bg-white rounded-3xl shadow-sm border overflow-hidden transition-all duration-300 ${live ? "border-orange-200 shadow-orange-100 shadow-md" : "border-gray-100"}`}
+                // ✅ FIXED: click the card → go to order-success
+                onClick={() => handleOrderClick(order)}
+                className={`bg-white rounded-3xl shadow-sm border overflow-hidden transition-all duration-300 cursor-pointer hover:shadow-md ${live ? "border-orange-200 shadow-orange-100 shadow-md" : "border-gray-100"}`}
               >
                 {/* Live indicator stripe */}
                 {live && <div className="h-1 w-full bg-gradient-to-r from-orange-400 to-yellow-400" />}
@@ -474,11 +487,19 @@ function Orders({ setPage }) {
                   )}
                 </div>
 
+                {/* ── Tap hint for non-active orders ── */}
+                {!live && normalizeStatus(order.status) !== "cancelled" && (
+                  <div className="px-4 pb-2">
+                    <p className="text-[10px] text-gray-300 text-center">Tap to view order details</p>
+                  </div>
+                )}
+
                 {/* Actions */}
                 <div className="flex gap-2 px-4 pb-4 flex-wrap">
                   {isTrackable && (
                     <button
-                      onClick={() => handleTrack(order.id)}
+                      // ✅ FIXED: stopPropagation so card click doesn't also fire
+                      onClick={(e) => handleTrack(e, order.id)}
                       className="flex items-center gap-1.5 text-xs font-semibold text-blue-500 bg-blue-50 border border-blue-200 px-3 py-2 rounded-xl hover:bg-blue-100 transition"
                     >
                       <FaMotorcycle /> Track Order
@@ -487,7 +508,8 @@ function Orders({ setPage }) {
 
                   {isCancellable && (
                     <button
-                      onClick={() => handleCancel(order.id)}
+                      // ✅ FIXED: stopPropagation
+                      onClick={(e) => handleCancel(e, order.id)}
                       disabled={cancellingId === order.id}
                       className="flex items-center gap-1.5 text-xs font-semibold text-red-500 bg-red-50 border border-red-200 px-3 py-2 rounded-xl hover:bg-red-100 transition disabled:opacity-50"
                     >
@@ -498,7 +520,8 @@ function Orders({ setPage }) {
 
                   {canReview && (
                     <button
-                      onClick={() => openReview(order)}
+                      // ✅ FIXED: stopPropagation
+                      onClick={(e) => openReview(e, order)}
                       className="flex items-center gap-1.5 text-xs font-semibold text-yellow-500 bg-yellow-50 border border-yellow-200 px-3 py-2 rounded-xl hover:bg-yellow-100 transition"
                     >
                       <FaStar className="text-[10px]" /> Write a Review
@@ -507,7 +530,8 @@ function Orders({ setPage }) {
 
                   {hasReview && (
                     <button
-                      onClick={() => openReview(order)}
+                      // ✅ FIXED: stopPropagation
+                      onClick={(e) => openReview(e, order)}
                       className="flex items-center gap-1.5 text-xs font-semibold text-green-500 bg-green-50 border border-green-200 px-3 py-2 rounded-xl hover:bg-green-100 transition"
                     >
                       <FaEdit className="text-[10px]" /> Edit Review
@@ -515,7 +539,8 @@ function Orders({ setPage }) {
                   )}
 
                   <button
-                    onClick={() => handleReorder(order.id)}
+                    // ✅ FIXED: stopPropagation
+                    onClick={(e) => handleReorder(e, order.id)}
                     disabled={reorderId === order.id}
                     className="flex items-center gap-1.5 text-xs font-semibold text-orange-500 bg-orange-50 border border-orange-200 px-3 py-2 rounded-xl hover:bg-orange-100 transition ml-auto disabled:opacity-50"
                   >
