@@ -65,6 +65,7 @@ const {
   getSubscriptionStatus,
   createSubscription,
   cancelSubscription,
+  pauseSubscription,
   applySubscriptionCoupon,
 } = require("../controllers/customerController");
 
@@ -189,6 +190,7 @@ router.get ("/subscription/plans",          protect, getSubscriptionPlans);
 router.get ("/subscription/status",         protect, getSubscriptionStatus);
 router.post("/subscription/create",         protect, createSubscription);
 router.post("/subscription/cancel",         protect, cancelSubscription);
+router.post("/subscription/pause",          protect, pauseSubscription);
 router.post("/subscription/apply-coupon",   protect, applySubscriptionCoupon);
 
 module.exports = router;

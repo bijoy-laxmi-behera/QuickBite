@@ -92,7 +92,7 @@ export default function VendorLayout() {
               <Route path="dashboard"     element={<Dashboard     isCloudKitchen={isCloudKitchen} restaurant={restaurant} />} />
               <Route path="orders"        element={<Orders        isCloudKitchen={isCloudKitchen} />} />
               <Route path="menu"          element={<Menu          isCloudKitchen={isCloudKitchen} />} />
-              <Route path="earnings"      element={<Earnings />} />
+              <Route path="earnings"      element={<Earnings      isCloudKitchen={isCloudKitchen} />} />
               <Route path="reviews"       element={<Reviews />} />
               <Route path="profile"       element={<Profile       restaurant={restaurant} setRestaurant={setRestaurant} isCloudKitchen={isCloudKitchen} />} />
               <Route path="notifications" element={<Notifications />} />
