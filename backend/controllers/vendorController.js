@@ -384,71 +384,135 @@ const getMenuItem = async (req, res) => {
   }
 };
 
-// CREATE MENU ITEM
+// ============================================================
+// CREATE MENU ITEM — FIXED
+// Fix 1: category is now optional (cloud kitchen items have no category)
+// Fix 2: category looked up globally, not filtered by vendor
+// Fix 3: price=0 allowed for cloud kitchen items
+// ============================================================
 const createMenuItem = async (req, res) => {
   try {
-    const { name, description, price, category, isveg, preparationTime, isAvailable } = req.body;
+    const {
+      name, description, price, category,
+      isveg, preparationTime, isAvailable,
+      mealSlot, dayOfWeek,
+    } = req.body;
 
     if (!name) return res.status(400).json({ success: false, message: "Menu item name is required" });
-    if (!price || price <= 0) return res.status(400).json({ success: false, message: "Valid price is required" });
-    if (!category) return res.status(400).json({ success: false, message: "Category is required" });
 
-    const categoryExists = await Category.findOne({ _id: category, vendor: req.user._id });
-    if (!categoryExists) return res.status(400).json({ success: false, message: "Invalid category selected" });
+    // Cloud kitchen items have price=0 and no category — don't enforce these
+    const isCloudItem = !price || Number(price) === 0;
+    if (!isCloudItem && (!price || Number(price) <= 0)) {
+      return res.status(400).json({ success: false, message: "Valid price is required" });
+    }
+
+    // FIX: category is optional; if provided, look it up globally (no vendor filter)
+    let resolvedCategory = null;
+    if (category && category.trim() !== "") {
+      const categoryExists = await Category.findById(category);
+      if (!categoryExists) {
+        return res.status(400).json({ success: false, message: "Invalid category selected" });
+      }
+      resolvedCategory = category;
+    }
 
     const menuData = {
-      name: name.trim(), description: description || '',
-      price: Number(price), category,
-      vendor: req.user._id,
-      isAvailable: isAvailable === 'true' || isAvailable === true,
-      isveg: isveg === 'true' || isveg === true,
+      name:            name.trim(),
+      description:     description || "",
+      price:           isCloudItem ? 0 : Number(price),
+      vendor:          req.user._id,
+      isAvailable:     isAvailable === "true" || isAvailable === true,
+      isveg:           isveg === "true" || isveg === true,
       preparationTime: preparationTime ? Number(preparationTime) : 30,
-      stock: -1, rating: 0, totalReviews: 0
+      stock:           -1,
+      rating:          0,
+      totalReviews:    0,
     };
 
-    const vendor = await User.findById(req.user._id).select('restaurantId restaurant');
-    const restaurantId = vendor?.restaurantId || vendor?.restaurant;
-    if (restaurantId) menuData.restaurant = restaurantId;
+    if (resolvedCategory)      menuData.category    = resolvedCategory;
+    if (mealSlot)              menuData.mealSlot    = mealSlot;
+    if (dayOfWeek)             menuData.dayOfWeek   = dayOfWeek;
 
-    if (req.file?.path)  menuData.image = req.file.path;
-    if (req.fileUrl)     menuData.image = req.fileUrl;
+    const vendor       = await User.findById(req.user._id).select("restaurantId restaurant");
+    const restaurantId = vendor?.restaurantId || vendor?.restaurant;
+    if (restaurantId)          menuData.restaurant  = restaurantId;
+
+    if (req.file?.path) menuData.image = req.file.path;
+    if (req.fileUrl)    menuData.image = req.fileUrl;
 
     const menuItem = await MenuItem.create(menuData);
-    await Category.findByIdAndUpdate(category, { $inc: { itemCount: 1 } });
+
+    // Only increment category count if category exists
+    if (resolvedCategory) {
+      await Category.findByIdAndUpdate(resolvedCategory, { $inc: { itemCount: 1 } });
+    }
 
     res.status(201).json({ success: true, data: menuItem, message: "Menu item created successfully" });
   } catch (error) {
     console.error("Error in createMenuItem:", error);
-    if (error.name === 'ValidationError') {
-      return res.status(400).json({ success: false, message: Object.values(error.errors).map(e => e.message).join(', ') });
+    if (error.name === "ValidationError") {
+      return res.status(400).json({
+        success: false,
+        message: Object.values(error.errors).map((e) => e.message).join(", "),
+      });
     }
     res.status(500).json({ success: false, message: error.message || "Failed to create menu item" });
   }
 };
 
-// UPDATE MENU ITEM
+// ============================================================
+// UPDATE MENU ITEM — FIXED
+// Fix 1: optional chaining on menuItem.category (may be null) — old code
+//        crashed with "Cannot read properties of null (reading 'toString')"
+// Fix 2: category validated globally, not filtered by vendor
+// Fix 3: handles category being cleared (set to empty string)
+// Fix 4: mealSlot / dayOfWeek now persisted on update
+// ============================================================
 const updateMenuItem = async (req, res) => {
   try {
-    const { name, description, price, category, isveg, preparationTime, isAvailable } = req.body;
+    const {
+      name, description, price, category,
+      isveg, preparationTime, isAvailable,
+      mealSlot, dayOfWeek,
+    } = req.body;
+
     const menuItem = await MenuItem.findById(req.params.id);
     if (!menuItem) return res.status(404).json({ success: false, message: "Menu item not found" });
     if (menuItem.vendor.toString() !== req.user._id.toString())
       return res.status(403).json({ success: false, message: "Not authorized to update this item" });
 
-    if (category && category !== menuItem.category.toString()) {
-      await Category.findByIdAndUpdate(menuItem.category, { $inc: { itemCount: -1 } });
-      await Category.findByIdAndUpdate(category, { $inc: { itemCount: 1 } });
-      menuItem.category = category;
+    // FIX: use optional chaining — menuItem.category may be null
+    const currentCategoryId = menuItem.category?.toString() || "";
+    const newCategoryId     = (category && category.trim() !== "") ? category.trim() : "";
+
+    if (newCategoryId && newCategoryId !== currentCategoryId) {
+      // Validate new category exists globally (no vendor filter)
+      const categoryExists = await Category.findById(newCategoryId);
+      if (!categoryExists) {
+        return res.status(400).json({ success: false, message: "Invalid category selected" });
+      }
+      // Adjust item counts
+      if (currentCategoryId) {
+        await Category.findByIdAndUpdate(currentCategoryId, { $inc: { itemCount: -1 } });
+      }
+      await Category.findByIdAndUpdate(newCategoryId, { $inc: { itemCount: 1 } });
+      menuItem.category = newCategoryId;
+    } else if (newCategoryId === "" && currentCategoryId) {
+      // Category cleared — decrement old count and unset
+      await Category.findByIdAndUpdate(currentCategoryId, { $inc: { itemCount: -1 } });
+      menuItem.category = null;
     }
 
-    if (name)                menuItem.name           = name.trim();
-    if (description !== undefined) menuItem.description = description;
-    if (price)               menuItem.price          = Number(price);
-    if (isveg !== undefined) menuItem.isveg          = isveg === 'true' || isveg === true;
-    if (preparationTime)     menuItem.preparationTime= Number(preparationTime);
-    if (isAvailable !== undefined) menuItem.isAvailable = isAvailable === 'true' || isAvailable === true;
-    if (req.file?.path)      menuItem.image          = req.file.path;
-    if (req.fileUrl)         menuItem.image          = req.fileUrl;
+    if (name)                         menuItem.name            = name.trim();
+    if (description !== undefined)    menuItem.description     = description;
+    if (price && Number(price) > 0)   menuItem.price           = Number(price);
+    if (isveg !== undefined)          menuItem.isveg           = isveg === "true" || isveg === true;
+    if (preparationTime)              menuItem.preparationTime = Number(preparationTime);
+    if (isAvailable !== undefined)    menuItem.isAvailable     = isAvailable === "true" || isAvailable === true;
+    if (mealSlot)                     menuItem.mealSlot        = mealSlot;
+    if (dayOfWeek)                    menuItem.dayOfWeek       = dayOfWeek;
+    if (req.file?.path)               menuItem.image           = req.file.path;
+    if (req.fileUrl)                  menuItem.image           = req.fileUrl;
 
     await menuItem.save();
     res.status(200).json({ success: true, data: menuItem, message: "Menu item updated successfully" });
@@ -1110,7 +1174,7 @@ const placeOrder = async (req, res) => {
   }
 };
 
-// GET NOTIFICATIONS — ✅ FIXED: returns `data` key (frontend expects data.data)
+// GET NOTIFICATIONS
 const getVendorNotifications = async (req, res) => {
   try {
     const notifications = await Notification.find({ vendor: req.user._id })
@@ -1177,7 +1241,6 @@ const notifyDeliveryForPickup = async (req, res) => {
     order.readyAt = new Date();
     await order.save();
 
-    // Notify delivery partners via socket
     const io = req.app.get("io");
     const activeDeliveries = await User.find({
       role: { $in: ["delivery", "deliveryPartner", "deliveryagent"] },

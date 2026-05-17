@@ -13,11 +13,15 @@ const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sun
 function ItemModal({ item, categories, isCloudKitchen, defaultSlot, onClose, onSave }) {
   const [form, setForm] = useState(
     item ? {
-      name: item.name || "", description: item.description || "",
-      price: item.price || "", category: item.category?._id || item.category || "",
-      isveg: item.isveg !== false, isAvailable: item.isAvailable !== false,
-      mealSlot: item.mealSlot || defaultSlot || "lunch",
-      dayOfWeek: item.dayOfWeek || "daily", image: null,
+      name:        item.name        || "",
+      description: item.description || "",
+      price:       item.price       || "",
+      category:    item.category?._id || item.category || "",
+      isveg:       item.isveg !== false,
+      isAvailable: item.isAvailable !== false,
+      mealSlot:    item.mealSlot  || defaultSlot || "lunch",
+      dayOfWeek:   item.dayOfWeek || "daily",
+      image:       null,
     } : {
       name: "", description: "", price: "", category: "",
       isveg: true, isAvailable: true,
@@ -38,21 +42,44 @@ function ItemModal({ item, categories, isCloudKitchen, defaultSlot, onClose, onS
   };
 
   const handleSubmit = async () => {
-    if (!form.name) { alert("Item name is required"); return; }
+    if (!form.name.trim()) { alert("Item name is required"); return; }
     if (!isCloudKitchen && !form.price) { alert("Price is required"); return; }
     setSaving(true);
     try {
       const fd = new FormData();
-      const payload = { ...form };
-      if (isCloudKitchen) { payload.price = 0; payload.isAvailable = true; payload.category = ""; }
-      Object.entries(payload).forEach(([k, v]) => {
-        if (k === "image" && v instanceof File) fd.append("image", v);
-        else if (k !== "image") fd.append(k, v);
-      });
-      if (item?._id)
+
+      // ── name, description always sent ──
+      fd.append("name",        form.name.trim());
+      fd.append("description", form.description || "");
+      fd.append("isveg",       form.isveg);
+
+      if (isCloudKitchen) {
+        // Cloud kitchen: price=0, no category, always available
+        fd.append("price",       "0");
+        fd.append("isAvailable", "true");
+        fd.append("mealSlot",    form.mealSlot);
+        fd.append("dayOfWeek",   form.dayOfWeek);
+        // deliberately do NOT append category for cloud kitchen items
+      } else {
+        fd.append("price",       form.price);
+        fd.append("isAvailable", form.isAvailable);
+        fd.append("mealSlot",    form.mealSlot);
+        fd.append("dayOfWeek",   form.dayOfWeek);
+        // only append category if one is actually selected
+        if (form.category && form.category.trim() !== "") {
+          fd.append("category", form.category);
+        }
+      }
+
+      if (form.image instanceof File) {
+        fd.append("image", form.image);
+      }
+
+      if (item?._id) {
         await API.put(`/vendor/menu/${item._id}`, fd, { headers: { "Content-Type": "multipart/form-data" } });
-      else
+      } else {
         await API.post("/vendor/menu", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      }
       onSave();
     } catch (e) {
       alert(e.response?.data?.message || "Save failed");
@@ -116,7 +143,7 @@ function ItemModal({ item, categories, isCloudKitchen, defaultSlot, onClose, onS
                 </div>
               </div>
               <div className={`text-xs font-medium px-3 py-2 rounded-xl ${
-                form.mealSlot === "lunch" ? "bg-orange-50 text-orange-600"
+                form.mealSlot === "lunch"  ? "bg-orange-50 text-orange-600"
                 : form.mealSlot === "dinner" ? "bg-blue-50 text-blue-600"
                 : "bg-purple-50 text-purple-600"
               }`}>
@@ -143,7 +170,6 @@ function ItemModal({ item, categories, isCloudKitchen, defaultSlot, onClose, onS
                   className="mt-1 w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-orange-400 transition bg-white"
                 >
                   <option value="">No category</option>
-                  {/* ── categories now loaded from /customer/categories ── */}
                   {categories.map((c) => (
                     <option key={c._id} value={c._id}>{c.name}</option>
                   ))}
@@ -183,8 +209,8 @@ function ItemModal({ item, categories, isCloudKitchen, defaultSlot, onClose, onS
               <span className="text-sm font-semibold text-gray-700">Available Today</span>
               <button onClick={() => f("isAvailable", !form.isAvailable)}>
                 {form.isAvailable
-                  ? <FaToggleOn className="text-green-500 text-2xl" />
-                  : <FaToggleOff className="text-gray-400 text-2xl" />
+                  ? <FaToggleOn  className="text-green-500 text-2xl" />
+                  : <FaToggleOff className="text-gray-400 text-2xl"  />
                 }
               </button>
             </div>
@@ -236,8 +262,8 @@ function CloudKitchenMenu({ menu, categories, onAdd, onEdit, onDelete, onToggle 
         </div>
         <div className="flex bg-gray-100 p-1 rounded-xl gap-1 ml-auto">
           {[
-            { val: "daily",  icon: <FaUtensils />,    label: "Daily Menu"        },
-            { val: "weekly", icon: <FaCalendarAlt />, label: "Weekly Rotation"   },
+            { val: "daily",  icon: <FaUtensils />,    label: "Daily Menu"      },
+            { val: "weekly", icon: <FaCalendarAlt />, label: "Weekly Rotation" },
           ].map((v) => (
             <button key={v.val} onClick={() => setView(v.val)}
               className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-bold transition ${
@@ -303,7 +329,7 @@ function CloudKitchenMenu({ menu, categories, onAdd, onEdit, onDelete, onToggle 
                 <img src={item.image || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=300&q=80"} alt={item.name} className="w-full h-full object-cover" />
                 <div className="absolute top-2 right-2">
                   <span className={`text-[10px] font-black px-2 py-1 rounded-full ${
-                    (item.mealSlot||"lunch") === "lunch" ? "bg-orange-500 text-white"
+                    (item.mealSlot||"lunch") === "lunch"  ? "bg-orange-500 text-white"
                     : (item.mealSlot||"lunch") === "dinner" ? "bg-blue-500 text-white"
                     : "bg-purple-500 text-white"
                   }`}>
@@ -482,7 +508,7 @@ export default function Menu({ isCloudKitchen }) {
     try {
       const [m, c] = await Promise.all([
         API.get("/vendor/menu"),
-        API.get("/customer/categories"), // ← FIX: was /vendor/categories (doesn't exist)
+        API.get("/customer/categories"),
       ]);
       const raw = m.data?.items || m.data?.data || m.data || [];
       setMenu(Array.isArray(raw) ? raw : []);
@@ -548,15 +574,26 @@ export default function Menu({ isCloudKitchen }) {
       </div>
 
       {isCloudKitchen ? (
-        <CloudKitchenMenu menu={menu} categories={categories} onAdd={handleAdd} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggle} fetchAll={fetchAll} />
+        <CloudKitchenMenu
+          menu={menu} categories={categories}
+          onAdd={handleAdd} onEdit={handleEdit}
+          onDelete={handleDelete} onToggle={handleToggle}
+        />
       ) : (
-        <RestaurantMenu menu={menu} categories={categories} onAdd={handleAdd} onEdit={handleEdit} onDelete={handleDelete} onToggle={handleToggle} />
+        <RestaurantMenu
+          menu={menu} categories={categories}
+          onAdd={handleAdd} onEdit={handleEdit}
+          onDelete={handleDelete} onToggle={handleToggle}
+        />
       )}
 
       {modal !== null && (
         <ItemModal
-          item={modal.item} categories={categories} isCloudKitchen={isCloudKitchen}
-          defaultSlot={modal.defaultSlot} onClose={() => setModal(null)}
+          item={modal.item}
+          categories={categories}
+          isCloudKitchen={isCloudKitchen}
+          defaultSlot={modal.defaultSlot}
+          onClose={() => setModal(null)}
           onSave={() => { setModal(null); fetchAll(); }}
         />
       )}
