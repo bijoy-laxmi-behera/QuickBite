@@ -5,6 +5,7 @@ const cors    = require("cors");
 const cookieParser = require("cookie-parser");
 const http    = require("http");
 const { Server } = require("socket.io");
+const jwt     = require("jsonwebtoken");
 
 // ── DB ────────────────────────────────────────────────────────────────────────
 const connectDB = require("./config/db");
@@ -17,7 +18,7 @@ const customerRoutes = require("./routes/customerRoutes");
 const deliveryRoutes = require("./routes/deliveryRoutes");
 const feedbackRoutes = require("./routes/feedbackRoutes");
 
-// ── Model (needed for broadcastOrderStatus helper) ────────────────────────────
+// ── Model ─────────────────────────────────────────────────────────────────────
 const Order = require("./models/Order");
 
 const app = express();
@@ -66,7 +67,7 @@ const server = http.createServer(app);
 
 const io = new Server(server, {
   cors: {
-    origin: ["https://quick-bite-2026.vercel.app","http://localhost:5173"],
+    origin: allowedOrigins,
     credentials: true,
   },
 });
@@ -74,34 +75,77 @@ const io = new Server(server, {
 // Make io accessible anywhere via req.app.get("io")
 app.set("io", io);
 
-// In-memory maps (no DB needed for these)
+// ── FIX: Socket.IO auth middleware ────────────────────────────────────────────
+// Validates the JWT sent by the frontend in socket.auth.token.
+// If the token is missing or invalid the connection is rejected BEFORE
+// the "connection" handler fires — this stops the connect/disconnect loop.
+io.use((socket, next) => {
+  const token = socket.handshake.auth?.token;
+
+  if (!token) {
+    // Allow unauthenticated connections (guest tracking, etc.) but mark them
+    socket.data.userId = null;
+    socket.data.role   = "guest";
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    // Support different payload shapes (id / _id / userId)
+    socket.data.userId = (decoded.id || decoded._id || decoded.userId || "").toString();
+    socket.data.role   = decoded.role || "user";
+    next();
+  } catch (err) {
+    // Invalid / expired token — reject cleanly instead of bouncing
+    console.warn("Socket auth rejected:", err.message);
+    next(new Error("Authentication error"));
+  }
+});
+
+// In-memory maps
 const activeDeliveryPartners = new Map(); // deliveryPartnerId → { socketId, location, currentOrder, lastUpdate }
 const orderTrackingRooms     = new Map(); // socket.id → { orderId, userId }
 
 // ── Socket.IO ─────────────────────────────────────────────────────────────────
 io.on("connection", (socket) => {
-  console.log("🔌 Connected:", socket.id);
+  console.log(`🔌 Connected: ${socket.id} (userId=${socket.data.userId}, role=${socket.data.role})`);
 
-  // ── Register user / join personal room ──────────────────────────────────────
+  // Auto-join personal room if we already know the userId from the token
+  if (socket.data.userId) {
+    socket.join(socket.data.userId);
+    if (socket.data.role) socket.join(`${socket.data.role}_${socket.data.userId}`);
+
+    if (socket.data.role === "delivery") {
+      activeDeliveryPartners.set(socket.data.userId, {
+        socketId:     socket.id,
+        location:     null,
+        currentOrder: null,
+        lastUpdate:   null,
+      });
+      console.log(`🚚 Delivery partner auto-registered: ${socket.data.userId}`);
+    }
+  }
+
+  // ── Register (explicit, for clients that send it manually) ──────────────────
   socket.on("register", ({ userId, role }) => {
     if (!userId) return;
-    socket.join(userId.toString());
-    if (role) socket.join(`${role}_${userId}`);
+    const uid = userId.toString();
+    socket.join(uid);
+    if (role) socket.join(`${role}_${uid}`);
 
     if (role === "delivery") {
-      activeDeliveryPartners.set(userId.toString(), {
-        socketId: socket.id,
-        location: null,
+      activeDeliveryPartners.set(uid, {
+        socketId:     socket.id,
+        location:     null,
         currentOrder: null,
-        lastUpdate: null,
+        lastUpdate:   null,
       });
-      console.log(`🚚 Delivery partner registered: ${userId}`);
+      console.log(`🚚 Delivery partner registered: ${uid}`);
     }
-    console.log(`✅ ${role || "user"} joined room: ${userId}`);
+    console.log(`✅ ${role || "user"} joined room: ${uid}`);
   });
 
-  // ── Order tracking room (used by OrderTracking.jsx) ──────────────────────────
-  // Frontend emits: joinOrderRoom / leaveOrderRoom
+  // ── Order tracking room ───────────────────────────────────────────────────
   socket.on("joinOrderRoom", (orderId) => {
     if (!orderId) return;
     socket.join(`order-${orderId}`);
@@ -117,7 +161,7 @@ io.on("connection", (socket) => {
     console.log(`📍 Socket ${socket.id} left order room: ${orderId}`);
   });
 
-  // Legacy event names (kept for backward compatibility with older code)
+  // Legacy event names
   socket.on("join-order-tracking", ({ orderId, userId }) => {
     if (!orderId) return;
     socket.join(`order-${orderId}`);
@@ -131,7 +175,7 @@ io.on("connection", (socket) => {
     orderTrackingRooms.delete(socket.id);
   });
 
-  // ── Delivery live GPS location ────────────────────────────────────────────────
+  // ── Delivery GPS ──────────────────────────────────────────────────────────
   socket.on("update-location", ({ deliveryPartnerId, orderId, location, status }) => {
     if (!deliveryPartnerId || !orderId || !location) return;
 
@@ -140,14 +184,13 @@ io.on("connection", (socket) => {
         ...activeDeliveryPartners.get(deliveryPartnerId),
         location,
         currentOrder: orderId,
-        lastUpdate: new Date(),
+        lastUpdate:   new Date(),
       });
     }
 
-    // Broadcast to everyone tracking this order
     io.to(`order-${orderId}`).emit("delivery-location-update", {
       orderId,
-      location: { lat: location.lat, lng: location.lng, accuracy: location.accuracy || null },
+      location:  { lat: location.lat, lng: location.lng, accuracy: location.accuracy || null },
       status:    status || "on_the_way",
       timestamp: new Date(),
       deliveryPartnerId,
@@ -164,15 +207,14 @@ io.on("connection", (socket) => {
     });
   });
 
-  // ── Order status update (emitted by controllers via req.app.get("io")) ────────
-  // Frontend listens to: "orderStatusUpdate"
+  // ── Order status update ───────────────────────────────────────────────────
   socket.on("orderUpdate", ({ userId, data }) => {
     if (!userId) return;
     io.to(userId.toString()).emit("orderStatusUpdate", data);
     if (data.orderId) io.to(`order-${data.orderId}`).emit("orderStatusUpdate", data);
   });
 
-  // ── Live location stream (request/stop) ───────────────────────────────────────
+  // ── Live location stream ──────────────────────────────────────────────────
   socket.on("request-live-location", ({ orderId, customerId }) => {
     if (!orderId || !customerId) return;
     socket.join(`live-location-${orderId}`);
@@ -198,19 +240,19 @@ io.on("connection", (socket) => {
     }
   });
 
-  // ── Notifications ─────────────────────────────────────────────────────────────
+  // ── Notifications ─────────────────────────────────────────────────────────
   socket.on("sendNotification", ({ userId, notification }) => {
     if (!userId) return;
     io.to(userId.toString()).emit("newNotification", notification);
   });
 
-  // ── Typing indicator (support chat) ──────────────────────────────────────────
+  // ── Typing indicator ──────────────────────────────────────────────────────
   socket.on("typing", ({ userId, orderId, isTyping }) => {
     if (!orderId) return;
     socket.to(`order-${orderId}`).emit("user-typing", { userId, isTyping });
   });
 
-  // ── Disconnect cleanup ────────────────────────────────────────────────────────
+  // ── Disconnect cleanup ────────────────────────────────────────────────────
   socket.on("disconnect", () => {
     console.log("❌ Disconnected:", socket.id);
     orderTrackingRooms.delete(socket.id);
@@ -225,36 +267,20 @@ io.on("connection", (socket) => {
   });
 });
 
-// ── Global helpers (call these from any controller) ───────────────────────────
+// ── Global helpers ────────────────────────────────────────────────────────────
 
-/**
- * Broadcast a delivery GPS location update to everyone tracking the order.
- * Usage in controller: global.broadcastDeliveryLocation(orderId, { lat, lng }, "on_the_way")
- */
 global.broadcastDeliveryLocation = (orderId, location, status) => {
   io.to(`order-${orderId}`).emit("delivery-location-update", {
     orderId, location, status, timestamp: new Date(),
   });
 };
 
-/**
- * Broadcast an order status change to:
- *   - the order's tracking room  → picked up by OrderTracking.jsx
- *   - the customer's personal room → picked up by Orders.jsx
- *
- * Usage in controller:
- *   global.broadcastOrderStatus(order._id, "preparing", order.customer)
- */
 global.broadcastOrderStatus = (orderId, status, userId, extra = {}) => {
   const payload = { orderId: orderId.toString(), status, timestamp: new Date(), ...extra };
   io.to(`order-${orderId}`).emit("orderStatusUpdate", payload);
   if (userId) io.to(userId.toString()).emit("orderStatusUpdate", payload);
 };
 
-/**
- * Broadcast a payment confirmation (used by razorpayController after webhook/verify).
- * Usage: global.broadcastPaymentConfirmed(orderId, userId)
- */
 global.broadcastPaymentConfirmed = (orderId, userId) => {
   const payload = { orderId: orderId.toString(), status: "paid", timestamp: new Date() };
   io.to(`order-${orderId}`).emit("paymentConfirmed", payload);
